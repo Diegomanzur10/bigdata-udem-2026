@@ -1,0 +1,155 @@
+# Recursos de Snowflake del curso. Nombres fijos según CONTRATO.md.
+# BIGDATA_RM NO lo crea ni lo asigna Terraform: lo crea bootstrap/snowflake/01_admin.sql con
+# ACCOUNTADMIN, que además lo asigna a la cuenta (ALTER ACCOUNT) y, tras el primer apply de este
+# stack, al warehouse (ALTER WAREHOUSE IF EXISTS ... en el mismo script, se vuelve a ejecutar).
+# Asignar un resource monitor requiere ACCOUNTADMIN; por eso el warehouse lo ignora en lifecycle.
+
+# ---------- Warehouse y base ----------
+
+resource "snowflake_warehouse" "bigdata" {
+  name                = "BIGDATA_WH"
+  warehouse_size      = "XSMALL"
+  auto_suspend        = 60
+  auto_resume         = true
+  initially_suspended = true
+  comment             = "Warehouse XS del curso Big Data"
+
+  lifecycle {
+    # Lo asigna 01_admin.sql con ACCOUNTADMIN; sin esto Terraform intentaría quitarlo.
+    ignore_changes = [resource_monitor]
+  }
+}
+
+resource "snowflake_database" "bigdata" {
+  name    = "BIGDATA"
+  comment = "Base del curso Big Data (capas BRONZE, SILVER, GOLD)"
+}
+
+resource "snowflake_schema" "layer" {
+  for_each = toset(["BRONZE", "SILVER", "GOLD"])
+
+  database = snowflake_database.bigdata.name
+  name     = each.key
+  comment  = "Capa ${each.key}"
+}
+
+# ---------- Rol de desarrollo para estudiantes ----------
+
+resource "snowflake_account_role" "dev" {
+  name    = "BIGDATA_DEV"
+  comment = "Rol de estudiantes: usa BIGDATA_WH y crea objetos en BIGDATA"
+}
+
+resource "snowflake_grant_account_role" "dev_users" {
+  for_each = toset(var.dev_users)
+
+  role_name = snowflake_account_role.dev.name
+  user_name = each.value
+}
+
+resource "snowflake_grant_privileges_to_account_role" "dev_warehouse" {
+  account_role_name = snowflake_account_role.dev.name
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_type = "WAREHOUSE"
+    object_name = snowflake_warehouse.bigdata.name
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "dev_database" {
+  account_role_name = snowflake_account_role.dev.name
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_type = "DATABASE"
+    object_name = snowflake_database.bigdata.name
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "dev_schemas" {
+  for_each = snowflake_schema.layer
+
+  account_role_name = snowflake_account_role.dev.name
+  privileges        = ["USAGE", "CREATE TABLE", "CREATE VIEW", "CREATE STAGE", "CREATE FILE FORMAT"]
+
+  on_schema {
+    schema_name = "${snowflake_database.bigdata.name}.${each.key}"
+  }
+}
+
+# SELECT sobre tablas y vistas futuras de cada capa (las que cree el pipeline u otros roles).
+locals {
+  future_selects = {
+    for p in setproduct(keys(snowflake_schema.layer), ["TABLES", "VIEWS"]) :
+    "${p[0]}_${p[1]}" => { schema = p[0], plural = p[1] }
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "dev_future_select" {
+  for_each = local.future_selects
+
+  account_role_name = snowflake_account_role.dev.name
+  privileges        = ["SELECT"]
+
+  on_schema_object {
+    future {
+      object_type_plural = each.value.plural
+      in_schema          = snowflake_schema.layer[each.value.schema].fully_qualified_name
+    }
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "dev_integration" {
+  account_role_name = snowflake_account_role.dev.name
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_type = "INTEGRATION"
+    object_name = snowflake_storage_integration_aws.s3.name
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "dev_stage" {
+  account_role_name = snowflake_account_role.dev.name
+  privileges        = ["USAGE", "READ"]
+
+  on_schema_object {
+    object_type = "STAGE"
+    object_name = "${snowflake_database.bigdata.name}.${snowflake_schema.layer["GOLD"].name}.${snowflake_stage_external_s3.lake_gold.name}"
+  }
+}
+
+# ---------- Integración con S3 y stage externo sobre gold/ ----------
+# Dos fases: aquí se crea la integración con el rol de infra/aws (trust placeholder).
+# Snowflake genera STORAGE_AWS_IAM_USER_ARN y STORAGE_AWS_EXTERNAL_ID (outputs de este stack);
+# se pegan en la trust policy del rol en infra/aws (fase 2).
+
+resource "snowflake_storage_integration_aws" "s3" {
+  name                      = "BIGDATA_S3_INT"
+  enabled                   = true
+  storage_provider          = "S3"
+  storage_aws_role_arn      = var.s3_role_arn
+  storage_allowed_locations = ["s3://${var.lake_bucket}/gold/"]
+  comment                   = "Acceso de Snowflake al prefijo gold/ del lake"
+}
+
+resource "snowflake_file_format_parquet" "parquet" {
+  database = snowflake_database.bigdata.name
+  schema   = snowflake_schema.layer["GOLD"].name
+  name     = "PARQUET_FF"
+  comment  = "Formato Parquet para leer gold/"
+}
+
+resource "snowflake_stage_external_s3" "lake_gold" {
+  database            = snowflake_database.bigdata.name
+  schema              = snowflake_schema.layer["GOLD"].name
+  name                = "LAKE_GOLD"
+  url                 = "s3://${var.lake_bucket}/gold/"
+  storage_integration = snowflake_storage_integration_aws.s3.name
+  comment             = "Stage externo sobre s3://<lake>/gold/"
+
+  file_format {
+    format_name = "${snowflake_database.bigdata.name}.${snowflake_schema.layer["GOLD"].name}.${snowflake_file_format_parquet.parquet.name}"
+  }
+}

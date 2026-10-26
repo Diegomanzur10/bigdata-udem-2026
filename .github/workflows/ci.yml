@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-2
+  TERRAFORM_VERSION: "1.17.0"
+  PREFIX: ${{ vars.PREFIX || 'bigdata' }}
+
+jobs:
+  lint-test:
+    name: Ruff y pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Instalar dependencias de desarrollo
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Ruff (lint)
+        run: ruff check .
+
+      - name: Ruff (formato)
+        run: ruff format --check .
+
+      - name: Pytest
+        run: pytest
+
+  airflow-dags:
+    name: Integridad de los DAGs de Airflow
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: airflow/requirements.txt
+
+      - name: Instalar Airflow (versiones fijas con constraints oficiales)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r airflow/requirements.txt pytest pyyaml
+
+      - name: Pytest de DAGs
+        run: pytest airflow/tests
+
+  terraform-validate:
+    name: Terraform fmt y validate (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [infra/aws, infra/snowflake]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Formato
+        working-directory: ${{ matrix.dir }}
+        run: terraform fmt -check -recursive -diff
+
+      - name: Init sin backend
+        working-directory: ${{ matrix.dir }}
+        run: terraform init -backend=false -input=false -no-color
+
+      - name: Validate
+        working-directory: ${{ matrix.dir }}
+        run: terraform validate -no-color
+
+  terraform-plan:
+    name: Terraform plan (infra/aws)
+    needs: [lint-test, airflow-dags, terraform-validate]
+    # Los secretos no llegan a PRs desde forks: solo planificar PRs del mismo repo.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_prefix: ${{ vars.PREFIX || 'bigdata' }}
+      TF_VAR_aws_region: us-east-2
+      # Correo de alertas: secret o variable ALERT_EMAIL del repo (obligatorio).
+      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL || vars.ALERT_EMAIL }}
+      # Flags y fase 2 de Snowflake: variables del repo (Settings > Secrets and variables > Actions > Variables).
+      TF_VAR_enable_glue: ${{ vars.ENABLE_GLUE || 'true' }}
+      TF_VAR_enable_airflow: ${{ vars.ENABLE_AIRFLOW || 'false' }}
+      TF_VAR_snowflake_iam_user_arn: ${{ vars.SNOWFLAKE_IAM_USER_ARN }}
+      TF_VAR_snowflake_external_id: ${{ vars.SNOWFLAKE_EXTERNAL_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Comprobar que existen los secretos de AWS
+        id: gate
+        env:
+          ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+          STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+        run: |
+          if [ -n "$ROLE_ARN" ] && [ -n "$STATE_BUCKET" ] && [ -n "$TF_VAR_alert_email" ]; then
+            echo "disponible=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Faltan AWS_ROLE_ARN, TF_STATE_BUCKET o ALERT_EMAIL; se omite terraform plan."
+            echo "disponible=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: hashicorp/setup-terraform@v4
+        if: steps.gate.outputs.disponible == 'true'
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
+        if: steps.gate.outputs.disponible == 'true'
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Init con backend S3
+        if: steps.gate.outputs.disponible == 'true'
+        working-directory: infra/aws
+        env:
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+        run: |
+          terraform init -input=false -no-color \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=aws/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="use_lockfile=true"
+
+      - name: Plan
+        if: steps.gate.outputs.disponible == 'true'
+        working-directory: infra/aws
+        run: terraform plan -input=false -no-color -lock-timeout=5m

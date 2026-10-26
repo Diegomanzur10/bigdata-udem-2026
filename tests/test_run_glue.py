@@ -1,0 +1,18 @@
+from __future__ import annotations
+
+from pipeline.run import build_parser
+from pipeline.run_glue import resueltos_a_argv
+
+
+def test_argv_de_glue_fija_engine_y_normaliza_guiones():
+    argv = resueltos_a_argv(
+        {"step": "silver", "env": "dev", "mes": "2024-01", "lake_bucket": "bigdata-lake-x"}
+    )
+    args = build_parser().parse_args(argv)
+    assert args.engine == "glue"
+    assert (args.step, args.env, args.mes, args.lake_bucket) == (
+        "silver",
+        "dev",
+        "2024-01",
+        "bigdata-lake-x",
+    )

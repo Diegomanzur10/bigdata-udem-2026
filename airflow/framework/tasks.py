@@ -1,0 +1,162 @@
+"""Constructores de tareas reutilizables para los DAGs del template.
+
+Convenciones (CONTRATO.md):
+- Jobs Glue `${prefix}-<perfil>` creados por Terraform; perfiles en profiles.yaml.
+- Conexión de Snowflake `snowflake_default`.
+- `prefix` se lee de la Variable de Airflow `prefix` (default "bigdata") al renderizar la
+  tarea, mediante Jinja (`var.value.get`). No se consulta la base de datos al parsear el DAG.
+
+Requisitos de la imagen de Airflow:
+- `src/` del repo debe estar en PYTHONPATH para `snowpark_connect_task` (ejecuta `pipeline.run`).
+  La VM de Airflow NO incluye `src/` ni el paquete de Snowpark Connect: la rama snowpark_connect
+  es opcional y requiere preparar la imagen (ver airflow/README.md).
+- `snowpark_connect_task` requiere el paquete de Snowpark Connect para Spark instalado en la
+  imagen (nombre de paquete [no verificado]: `snowpark-connect`). No está en requirements.txt.
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+import yaml
+from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from airflow.providers.standard.operators.python import PythonOperator
+
+PROFILES_FILE = Path(__file__).with_name("profiles.yaml")
+
+# Región: la VM exporta AWS_DEFAULT_REGION (compose); por defecto la del contrato (aws_region).
+AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-2")
+SNOWFLAKE_CONN_ID = "snowflake_default"
+
+# Plantilla Jinja: se resuelve en tiempo de ejecución.
+PREFIX_TEMPLATE = "{{ var.value.get('prefix', 'bigdata') }}"
+
+VALID_STEPS = ("bronze", "silver", "gold", "all")
+
+
+def load_profiles() -> dict[str, dict[str, Any]]:
+    """Devuelve el diccionario de perfiles definido en profiles.yaml."""
+    with PROFILES_FILE.open(encoding="utf-8") as fh:
+        return yaml.safe_load(fh)["profiles"]
+
+
+def glue_run_console_url(region: str, job_name: str, run_id: str) -> str:
+    """Enlace a la página del job run en la consola de Glue [formato no verificado]."""
+    return (
+        f"https://{region}.console.aws.amazon.com/gluestudio/home?region={region}"
+        f"#/job/{job_name}/run/{run_id}"
+    )
+
+
+def glue_spark_ui_url(region: str, job_name: str, run_id: str) -> str:
+    """Enlace al Spark UI del job run en la consola de Glue [formato no verificado]."""
+    return glue_run_console_url(region, job_name, run_id) + "/sparkui"
+
+
+class GlueJobWithLinks(GlueJobOperator):
+    """GlueJobOperator que escribe en el log los enlaces a la consola y al Spark UI."""
+
+    def submit_job(self, context):  # type: ignore[override]
+        run_id = super().submit_job(context)
+        region = self.region_name or AWS_REGION
+        self.log.info(
+            "Glue job run (consola): %s",
+            glue_run_console_url(region, self.job_name, run_id),
+        )
+        self.log.info("Spark UI: %s", glue_spark_ui_url(region, self.job_name, run_id))
+        return run_id
+
+
+def glue_task(
+    task_id: str,
+    step: str,
+    profile: str,
+    env: str = "{{ params.env }}",
+    mes: str = "{{ params.mes }}",
+    engine: str = "glue",
+) -> GlueJobWithLinks:
+    """Tarea que ejecuta un step del pipeline en el job Glue `${prefix}-<profile>`.
+
+    El job ejecuta run_glue.py, que fija el engine glue; por eso `engine` solo admite "glue".
+    Para snowpark_connect usar snowpark_connect_task.
+    """
+    if step not in VALID_STEPS:
+        raise ValueError(f"step inválido {step!r}; válidos: {VALID_STEPS}")
+    if engine != "glue":
+        raise ValueError("glue_task solo admite engine='glue'; usa snowpark_connect_task")
+
+    profiles = load_profiles()
+    if profile not in profiles:
+        raise ValueError(f"perfil desconocido {profile!r}; válidos: {sorted(profiles)}")
+    cfg = profiles[profile]
+    job_name = cfg["job"].replace("${prefix}", PREFIX_TEMPLATE)
+
+    return GlueJobWithLinks(
+        task_id=task_id,
+        job_name=job_name,
+        script_args={"--step": step, "--env": env, "--mes": mes},
+        run_job_kwargs={
+            "NumberOfWorkers": cfg["number_of_workers"],
+            "Timeout": cfg["timeout"],
+        },
+        region_name=AWS_REGION,
+        wait_for_completion=True,
+        # verbose=True leería CloudWatch Logs con el rol de la VM, que (por contrato) no tiene
+        # permisos de logs. Los logs se consultan en Glue/CloudWatch con los enlaces del log.
+        verbose=False,
+        # Sin durable se mantienen exactamente los script_args del contrato
+        # (durable añade --airflow_task_uuid).
+        durable=False,
+    )
+
+
+def snowflake_task(task_id: str, sql_file: str) -> SQLExecuteQueryOperator:
+    """Tarea que ejecuta un archivo SQL (relativo a la carpeta dags/) en Snowflake."""
+    return SQLExecuteQueryOperator(
+        task_id=task_id,
+        conn_id=SNOWFLAKE_CONN_ID,
+        sql=sql_file,
+        split_statements=True,
+    )
+
+
+def run_pipeline_step(step: str, env: str, mes: str) -> None:
+    """Ejecuta `pipeline.run` con engine snowpark_connect en un subproceso."""
+    cmd = [
+        sys.executable,
+        "-m",
+        "pipeline.run",
+        "--step",
+        step,
+        "--env",
+        env,
+        "--engine",
+        "snowpark_connect",
+        "--mes",
+        mes,
+    ]
+    subprocess.run(cmd, check=True)
+
+
+def snowpark_connect_task(
+    task_id: str,
+    step: str,
+    env: str = "{{ params.env }}",
+    mes: str = "{{ params.mes }}",
+) -> PythonOperator:
+    """Tarea opcional para comparar contra Glue: mismo step con engine snowpark_connect.
+
+    Requiere `src/` en PYTHONPATH y el paquete de Snowpark Connect en la imagen de Airflow.
+    """
+    if step not in VALID_STEPS:
+        raise ValueError(f"step inválido {step!r}; válidos: {VALID_STEPS}")
+    return PythonOperator(
+        task_id=task_id,
+        python_callable=run_pipeline_step,
+        op_kwargs={"step": step, "env": env, "mes": mes},
+    )

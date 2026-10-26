@@ -1,0 +1,17 @@
+# Opcional: copiar a terraform.tfvars (ignorado por git) para uso local.
+# OJO: terraform.tfvars NO existe en GitHub Actions. 'make deploy' y deploy.yml pasan con -var / TF_VAR_*
+# (ganan sobre este archivo) estas variables, que vienen de .env (local) o de los secrets/variables del repo:
+#   ALERT_EMAIL (obligatoria), ENABLE_GLUE, ENABLE_AIRFLOW, SNOWFLAKE_IAM_USER_ARN, SNOWFLAKE_EXTERNAL_ID.
+# Aqui deja solo lo que quieras fijar localmente. Usa un correo real solo en tu copia local.
+aws_region = "us-east-2"
+prefix     = "bigdata"
+budget_usd = 50
+
+# alert_email = "tu-correo@ejemplo.com"  # prefiere ALERT_EMAIL en .env
+
+# Airflow (solo si enable_airflow = true; el flag lo controla ENABLE_AIRFLOW)
+airflow_instance_type = "m7i-flex.large" # fallback: c7i-flex.large
+allowed_cidrs         = []               # p. ej. ["203.0.113.10/32"] para HTTP 8080 (mejor: workflow permitir-ip)
+
+# Permissions boundary de los roles (por defecto arn:aws:iam::<cuenta>:policy/<prefix>-boundary, creada por bootstrap).
+# permissions_boundary_arn = null

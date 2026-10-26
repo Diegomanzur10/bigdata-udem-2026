@@ -1,0 +1,11 @@
+# Entorno dev: S3. {lake_bucket} se reemplaza por la variable de entorno LAKE_BUCKET
+# (nombre del bucket del lake, p. ej. bigdata-lake-<account>-us-east-2).
+entorno: dev
+rutas:
+  bronze: s3://{lake_bucket}/bronze
+  silver: s3://{lake_bucket}/silver
+  gold: s3://{lake_bucket}/gold
+muestra:
+  max_rows: null
+meses:
+  - "2024-01"
