@@ -99,23 +99,139 @@ instance_public_ip() {
   fi
 }
 
-# Variables de Terraform de infra/aws que vienen del entorno (.env en local; variables y secrets
-# de GitHub en CI). Se pasan con -var porque ganan sobre terraform.tfvars: así 'make deploy' y
-# deploy.yml aplican lo mismo. Deja el resultado en el arreglo TF_AWS_VARS.
-#   ALERT_EMAIL                              -> alert_email (obligatoria)
-#   ENABLE_AIRFLOW / ENABLE_GLUE             -> enable_airflow / enable_glue (true|false)
-#   SNOWFLAKE_IAM_USER_ARN / SNOWFLAKE_EXTERNAL_ID -> fase 2 de la storage integration
-armar_vars_aws() {
-  TF_AWS_VARS=()
-  if [[ -n "${ALERT_EMAIL:-}" ]]; then TF_AWS_VARS+=(-var "alert_email=${ALERT_EMAIL}"); fi
-  if [[ -n "${ENABLE_AIRFLOW:-}" ]]; then TF_AWS_VARS+=(-var "enable_airflow=${ENABLE_AIRFLOW}"); fi
-  if [[ -n "${ENABLE_GLUE:-}" ]]; then TF_AWS_VARS+=(-var "enable_glue=${ENABLE_GLUE}"); fi
-  if [[ -n "${SNOWFLAKE_IAM_USER_ARN:-}" ]]; then
-    TF_AWS_VARS+=(-var "snowflake_iam_user_arn=${SNOWFLAKE_IAM_USER_ARN}")
+# Configuración de infra/aws: fuente única de verdad en s3://<TF_STATE_BUCKET>/config/aws.tfvars
+# (HCL, bucket de state con versionado). 'make setup' la crea; deploy.sh y deploy.yml la descargan
+# con config_pull y la pasan con -var-file. Claves típicas: prefix, aws_region, alert_email,
+# enable_glue, enable_airflow, snowflake_iam_user_arn, snowflake_external_id (ver CONTRATO.md).
+CONFIG_S3_KEY="config/aws.tfvars"
+CONFIG_LOCAL="$ROOT_DIR/infra/aws/config.auto.tfvars"
+
+config_uri() {
+  echo "s3://$(tfstate_bucket)/${CONFIG_S3_KEY}"
+}
+
+_config_copiar() {
+  # Copia $1 a $2. Devuelve 0 si fue bien, 1 si el origen no existe, 2 en otro caso.
+  local origen="$1" destino="$2" salida
+  if salida="$(aws s3 cp "$origen" "$destino" --only-show-errors 2>&1)"; then
+    return 0
   fi
-  if [[ -n "${SNOWFLAKE_EXTERNAL_ID:-}" ]]; then
-    TF_AWS_VARS+=(-var "snowflake_external_id=${SNOWFLAKE_EXTERNAL_ID}")
+  rm -f "$destino"
+  if [[ "$salida" == *"Not Found"* || "$salida" == *"NoSuchKey"* || "$salida" == *"404"* ]]; then
+    return 1
   fi
+  echo "$salida" >&2
+  return 2
+}
+
+_config_fallo() {
+  # Termina con error según el código de _config_copiar ($1) para el origen $2.
+  case "$1" in
+    1) error "Falta la configuración en S3. Corre 'make setup' en Code Editor." ;;
+    *) error "No se pudo leer la configuración en $2 (revisa credenciales y permisos)." ;;
+  esac
+}
+
+config_existe() {
+  # 0 si la configuración existe, 1 si no. Sale con error si no se puede comprobar
+  # (así 'make setup' nunca sobrescribe una configuración que no pudo ver).
+  local salida
+  if salida="$(aws s3api head-object --bucket "$(tfstate_bucket)" --key "$CONFIG_S3_KEY" 2>&1)"; then
+    return 0
+  fi
+  if [[ "$salida" == *"Not Found"* || "$salida" == *"404"* ]]; then
+    return 1
+  fi
+  error "No se pudo comprobar la configuración en S3: $salida"
+}
+
+config_leer() {
+  # Imprime el valor de la clave $1 en el archivo $2 (sin comillas ni comentario); vacío si no está.
+  local clave="$1" archivo="$2" linea
+  linea="$(grep -E "^[[:space:]]*${clave}[[:space:]]*=" "$archivo" | head -1 || true)"
+  linea="${linea#*=}"
+  linea="${linea%%#*}"
+  sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' <<< "$linea"
+}
+
+config_pull() {
+  # Descarga la configuración a $1 (por defecto infra/aws/config.auto.tfvars) y comprueba que
+  # prefix, aws_region y alert_email existan y coincidan con el entorno.
+  local destino="${1:-$CONFIG_LOCAL}" origen rc=0 valor
+  origen="$(config_uri)"
+  _config_copiar "$origen" "$destino" || rc=$?
+  (( rc == 0 )) || _config_fallo "$rc" "$origen"
+
+  valor="$(config_leer prefix "$destino")"
+  [[ -z "$valor" || "$valor" == "$PREFIX" ]] \
+    || error "La configuración en S3 tiene prefix = '$valor' y PREFIX = '$PREFIX'. Deben coincidir (revisa .env o vars.PREFIX)."
+  valor="$(config_leer aws_region "$destino")"
+  [[ -z "$valor" || "$valor" == "$AWS_REGION" ]] \
+    || error "La configuración en S3 tiene aws_region = '$valor' y AWS_REGION = '$AWS_REGION'. Deben coincidir."
+  [[ -n "$(config_leer alert_email "$destino")" ]] \
+    || error "La configuración en S3 no tiene alert_email. Vuelve a crearla con 'make setup' o agrégala en $origen."
+}
+
+config_push() {
+  # Sube el archivo $1 como configuración de AWS en S3 (reemplaza la versión actual).
+  local archivo="$1" destino
+  destino="$(config_uri)"
+  aws s3 cp "$archivo" "$destino" --only-show-errors || error "No se pudo subir la configuración a $destino."
+}
+
+config_literal() {
+  # Convierte un valor a literal HCL: true/false y enteros sin comillas; el resto entre comillas.
+  local v="$1"
+  if [[ "$v" == true || "$v" == false || "$v" =~ ^-?[0-9]+$ ]]; then
+    echo "$v"
+  else
+    v="${v//\\/\\\\}"
+    v="${v//\"/\\\"}"
+    echo "\"$v\""
+  fi
+}
+
+config_set() {
+  # Uso: config_set clave valor. Actualiza (o agrega) la clave en la configuración de S3,
+  # conserva las demás y sube el resultado.
+  local clave="$1" valor="$2" origen tmp rc=0
+  [[ "$clave" =~ ^[a-z][a-z0-9_]*$ ]] || error "Clave de configuración no válida: '$clave'."
+  origen="$(config_uri)"
+  tmp="$(mktemp)"
+  _config_copiar "$origen" "$tmp" || rc=$?
+  (( rc == 0 )) || _config_fallo "$rc" "$origen"
+
+  LINEA="$clave = $(config_literal "$valor")" CLAVE="$clave" awk '
+    BEGIN { re = "^[[:space:]]*" ENVIRON["CLAVE"] "[[:space:]]*=" }
+    $0 ~ re { print ENVIRON["LINEA"]; hecho = 1; next }
+    { print }
+    END { if (!hecho) print ENVIRON["LINEA"] }
+  ' "$tmp" > "$tmp.nuevo"
+  mv "$tmp.nuevo" "$tmp"
+  config_push "$tmp"
+  rm -f "$tmp"
+  msg "$clave actualizado en $origen"
+}
+
+guardia_destruccion() {
+  # Uso: guardia_destruccion <archivo-plan>. Si el plan elimina o reemplaza recursos, aborta
+  # salvo que CONFIRMAR_DESTRUCCION=true. Requiere estar en el directorio de infra/aws y jq.
+  local plan="$1" lista cuantos
+  lista="$(terraform show -json "$plan" | jq -r \
+    '.resource_changes[]? | select((.change.actions // []) | index("delete")) | "  - \(.change.actions | join("+")): \(.address)"')" \
+    || error "No se pudo leer el plan con 'terraform show -json'."
+  if [[ -z "$lista" ]]; then
+    msg "El plan no elimina recursos."
+    return 0
+  fi
+  cuantos="$(printf '%s\n' "$lista" | wc -l | tr -d ' ')"
+  echo "Recursos que el plan elimina o reemplaza ($cuantos):" >&2
+  echo "$lista" >&2
+  if [[ "${CONFIRMAR_DESTRUCCION:-}" == "true" ]]; then
+    aviso "CONFIRMAR_DESTRUCCION=true: se aplicará la destrucción listada."
+    return 0
+  fi
+  error "El plan destruye recursos. Si es intencional, repite con CONFIRMAR_DESTRUCCION=true (en deploy.yml: input confirmar_destruccion)."
 }
 
 studio_console_url() {

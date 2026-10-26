@@ -1,15 +1,11 @@
-# Opcional: copiar a terraform.tfvars (ignorado por git) para uso local.
-# OJO: terraform.tfvars NO existe en GitHub Actions. 'make deploy' y deploy.yml pasan con -var / TF_VAR_*
-# (ganan sobre este archivo) estas variables, que vienen de .env (local) o de los secrets/variables del repo:
-#   ALERT_EMAIL (obligatoria), ENABLE_GLUE, ENABLE_AIRFLOW, SNOWFLAKE_IAM_USER_ARN, SNOWFLAKE_EXTERNAL_ID.
-# Aqui deja solo lo que quieras fijar localmente. Usa un correo real solo en tu copia local.
-aws_region = "us-east-2"
-prefix     = "bigdata"
+# Opcional. Este archivo NO se usa en 'make deploy' ni en GitHub Actions: no lo versiones.
+# La configuración del alumno (prefix, aws_region, alert_email, enable_glue, enable_airflow,
+# snowflake_iam_user_arn, snowflake_external_id) vive en s3://<TF_STATE_BUCKET>/config/aws.tfvars
+# (ver 'make config', 'make airflow-habilitar' y 'make snowflake'). No la dupliques aquí.
+# Solo ajustes que no estén en esa configuración, por ejemplo:
 budget_usd = 50
 
-# alert_email = "tu-correo@ejemplo.com"  # prefiere ALERT_EMAIL en .env
-
-# Airflow (solo si enable_airflow = true; el flag lo controla ENABLE_AIRFLOW)
+# Airflow (el flag enable_airflow se cambia con 'make airflow-habilitar' / 'make airflow-deshabilitar')
 airflow_instance_type = "m7i-flex.large" # fallback: c7i-flex.large
 allowed_cidrs         = []               # p. ej. ["203.0.113.10/32"] para HTTP 8080 (mejor: workflow permitir-ip)
 

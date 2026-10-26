@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
 # Despliegue local equivalente a .github/workflows/deploy.yml:
-# terraform apply de infra/aws y sincronización de código y DAGs a S3.
+# configuración desde s3://<state>/config/aws.tfvars, plan con -out, guardia de destrucción,
+# apply de infra/aws y sincronización de código y DAGs a S3.
 #
-# Variables (en .env o en el entorno): ALERT_EMAIL (obligatoria si no está en
-# infra/aws/terraform.tfvars), ENABLE_AIRFLOW, ENABLE_GLUE, SNOWFLAKE_IAM_USER_ARN y
-# SNOWFLAKE_EXTERNAL_ID (fase 2 de la integración con Snowflake). Ver armar_vars_aws en lib.sh.
+# La configuración de Terraform (enable_airflow, enable_glue, alert_email, fase 2 de Snowflake...)
+# vive solo en S3: se cambia con 'make config' / 'make airflow-habilitar' / 'make snowflake'.
+# Si el plan elimina o reemplaza recursos, el script aborta salvo CONFIRMAR_DESTRUCCION=true.
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-requerir aws terraform zip
+requerir aws terraform zip jq
 
 BUCKET_ESTADO="$(tfstate_bucket)"
 LAKE="$(lake_bucket)"
 msg "Bucket de estado: $BUCKET_ESTADO"
 msg "Bucket del lake: $LAKE"
 
-if [[ -z "${ALERT_EMAIL:-}" ]] && ! grep -qs '^[[:space:]]*alert_email[[:space:]]*=' "$ROOT_DIR/infra/aws/terraform.tfvars"; then
-  error "Falta el correo de alertas. Define ALERT_EMAIL en .env (make setup lo pide) o alert_email en infra/aws/terraform.tfvars."
-fi
-armar_vars_aws
+msg "Descargando configuración de $(config_uri)"
+config_pull
 
 PLAN_FILE="$(mktemp -t tfplan.XXXXXX)"
 trap 'rm -f "$PLAN_FILE"' EXIT
@@ -32,9 +31,12 @@ terraform init -input=false \
   -backend-config="use_lockfile=true"
 
 msg "Terraform plan (infra/aws)"
-terraform plan -input=false -lock-timeout=5m -out="$PLAN_FILE" ${TF_AWS_VARS[@]+"${TF_AWS_VARS[@]}"}
+terraform plan -input=false -lock-timeout=5m -out="$PLAN_FILE" -var-file="$CONFIG_LOCAL"
 
-msg "Terraform apply (revisa el plan anterior)"
+msg "Guardia de destrucción"
+guardia_destruccion "$PLAN_FILE"
+
+msg "Terraform apply (aplica el plan revisado)"
 terraform apply -input=false -lock-timeout=5m "$PLAN_FILE"
 
 msg "Empaquetando src/pipeline"

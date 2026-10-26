@@ -103,40 +103,36 @@ jobs:
   terraform-plan:
     name: Terraform plan (infra/aws)
     needs: [lint-test, airflow-dags, terraform-validate]
-    # Los secretos no llegan a PRs desde forks: solo planificar PRs del mismo repo.
-    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     env:
       TF_IN_AUTOMATION: "true"
-      TF_VAR_prefix: ${{ vars.PREFIX || 'bigdata' }}
-      TF_VAR_aws_region: us-east-2
-      # Correo de alertas: secret o variable ALERT_EMAIL del repo (obligatorio).
-      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL || vars.ALERT_EMAIL }}
-      # Flags y fase 2 de Snowflake: variables del repo (Settings > Secrets and variables > Actions > Variables).
-      TF_VAR_enable_glue: ${{ vars.ENABLE_GLUE || 'true' }}
-      TF_VAR_enable_airflow: ${{ vars.ENABLE_AIRFLOW || 'false' }}
-      TF_VAR_snowflake_iam_user_arn: ${{ vars.SNOWFLAKE_IAM_USER_ARN }}
-      TF_VAR_snowflake_external_id: ${{ vars.SNOWFLAKE_EXTERNAL_ID }}
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - name: Comprobar que existen los secretos de AWS
+      - name: Comprobar secrets de AWS
         id: gate
         env:
           ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-          STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          # Los secrets no llegan a PRs desde forks: ahí se omite el plan con un aviso.
+          ES_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
-          if [ -n "$ROLE_ARN" ] && [ -n "$STATE_BUCKET" ] && [ -n "$TF_VAR_alert_email" ]; then
-            echo "disponible=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Faltan AWS_ROLE_ARN, TF_STATE_BUCKET o ALERT_EMAIL; se omite terraform plan."
+          set -euo pipefail
+          if [ "$ES_FORK" = "true" ]; then
+            echo "::notice::PR desde fork: no hay secrets de AWS; se omite terraform plan."
             echo "disponible=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          if [ -z "$ROLE_ARN" ] || [ -z "$TF_STATE_BUCKET" ]; then
+            echo "::error::Faltan los secrets AWS_ROLE_ARN y/o TF_STATE_BUCKET (outputs GitHubActionsRoleArn y TfStateBucket del bootstrap)."
+            exit 1
+          fi
+          echo "disponible=true" >> "$GITHUB_OUTPUT"
 
       - uses: hashicorp/setup-terraform@v4
         if: steps.gate.outputs.disponible == 'true'
@@ -150,11 +146,16 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Descargar configuración de infra/aws (S3)
+        if: steps.gate.outputs.disponible == 'true'
+        run: |
+          set -euo pipefail
+          source "$GITHUB_WORKSPACE/scripts/lib.sh"
+          config_pull
+
       - name: Init con backend S3
         if: steps.gate.outputs.disponible == 'true'
         working-directory: infra/aws
-        env:
-          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
         run: |
           terraform init -input=false -no-color \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
@@ -165,4 +166,4 @@ jobs:
       - name: Plan
         if: steps.gate.outputs.disponible == 'true'
         working-directory: infra/aws
-        run: terraform plan -input=false -no-color -lock-timeout=5m
+        run: terraform plan -input=false -no-color -lock-timeout=5m -var-file=config.auto.tfvars

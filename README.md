@@ -55,28 +55,49 @@ Haz los pasos en este orden.
    ```bash
    git clone https://github.com/<TU_USUARIO>/<TU_FORK>.git && cd <TU_FORK>
    ```
-7. **`make setup`.** Verifica herramientas (Python 3.11, Java 17, AWS CLI, Terraform, Snowflake CLI `snow`, jq, zip), crea `.venv`, valida que Snowflake esté en AWS, alinea `AWS_REGION` y te pide el correo de alertas (`ALERT_EMAIL`). Antes configura `snow` (`~/.snowflake/config.toml`) y comprueba con `make doctor`.
-8. **Secrets y variables del fork** (Settings > Secrets and variables > Actions):
+7. **`make setup`.** Verifica herramientas (Python 3.11, Java 17, AWS CLI, Terraform, Snowflake CLI `snow`, jq, zip), crea `.venv`, valida que Snowflake esté en AWS, alinea `AWS_REGION` y, si todavía no existe, crea en S3 la configuración de Terraform (te pide el correo de alertas). Antes configura `snow` (`~/.snowflake/config.toml`) y comprueba con `make doctor`.
+8. **Secrets del fork** (Settings > Secrets and variables > Actions):
 
    | Nombre | Tipo | Valor |
    |---|---|---|
    | `AWS_ROLE_ARN` | secret | output `GitHubActionsRoleArn` del bootstrap |
    | `TF_STATE_BUCKET` | secret | output `TfStateBucket` del bootstrap |
-   | `ALERT_EMAIL` | secret o variable | correo para alertas de presupuesto |
-   | `ENABLE_AIRFLOW` | variable (opcional) | `true` para crear la VM de Airflow (default `false`) |
-   | `SNOWFLAKE_IAM_USER_ARN`, `SNOWFLAKE_EXTERNAL_ID` | variables | los entrega Snowflake en la fase 2 (abajo) |
    | `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PRIVATE_KEY` | secrets | reservados para workflows de Snowflake; los workflows actuales no los usan |
 
-9. **`make deploy`.** Aplica `infra/aws` (lake, Glue, Athena, guardrails y, si lo activas, Airflow) y sube a S3 el código del pipeline (`pipeline.zip`, `run_glue.py`), los DAGs y el framework de Airflow. Para activar Airflow en local agrega `ENABLE_AIRFLOW=true` a `.env` antes de desplegar. También se ejecuta solo en cada push a `main`.
+   La configuración de Terraform (correo de alertas, Airflow, Glue y la fase 2 de Snowflake) no va en secrets ni variables: está en S3 ([ver abajo](#configuración-por-estudiante)).
+
+9. **`make deploy`.** Aplica `infra/aws` (lake, Glue, Athena, guardrails y, si lo activas, Airflow) y sube a S3 el código del pipeline (`pipeline.zip`, `run_glue.py`), los DAGs y el framework de Airflow. Para activar Airflow usa `make airflow-habilitar` (cambia la configuración y despliega). También se ejecuta solo en cada push a `main`.
 
 10. **Snowflake (después de AWS).** El orden importa porque AWS y Snowflake se necesitan mutuamente:
     1. `bootstrap/snowflake/gen_key.sh` genera la llave; pega la clave pública en `bootstrap/snowflake/01_admin.sql` y ejecútalo en Snowsight como `ACCOUNTADMIN` (crea el resource monitor y el usuario `TERRAFORM_SVC`).
-    2. En `infra/snowflake`: `cp terraform.tfvars.example terraform.tfvars`, `cp backend.hcl.example backend.hcl`, completa los valores y ejecuta `make init plan apply`. Anota `make outputs`.
-    3. Pasa `storage_aws_iam_user_arn` y `storage_aws_external_id` a AWS como `SNOWFLAKE_IAM_USER_ARN` y `SNOWFLAKE_EXTERNAL_ID` (`.env` y variables del fork) y vuelve a ejecutar `make deploy`.
+    2. En `infra/snowflake`: `cp terraform.tfvars.example terraform.tfvars`, `cp backend.hcl.example backend.hcl` y completa los valores (la llave privada queda en `~/.snowflake/keys/`).
+    3. Desde la raíz, `make snowflake`: aplica `infra/snowflake`, guarda `storage_aws_iam_user_arn` y `storage_aws_external_id` en la configuración de S3 y aplica la fase 2 de AWS (trust policy del rol). No hay que copiar valores a mano.
 
     Detalle: [infra/snowflake/README.md](infra/snowflake/README.md).
 
-11. **Ejecuta el pipeline.** En local: `make run-local STEP=all MES=2024-01`. En la nube: `make airflow-on` (con `ENABLE_AIRFLOW=true`), abre el túnel con `make airflow-tunel`, usuario `admin` y contraseña de `make airflow-password`, y lanza el DAG `pipeline_taxi`. Guarda antes la conexión de Snowflake en el secreto `bigdata/snowflake` ([airflow/README.md](airflow/README.md)).
+11. **Ejecuta el pipeline.** En local: `make run-local STEP=all MES=2024-01`. En la nube: `make airflow-habilitar` (una vez; crea la VM), `make airflow-on`, abre el túnel con `make airflow-tunel`, usuario `admin` y contraseña de `make airflow-password`, y lanza el DAG `pipeline_taxi`. Guarda antes la conexión de Snowflake en el secreto `bigdata/snowflake` ([airflow/README.md](airflow/README.md)).
+
+## Configuración por estudiante
+
+Una sola fuente de verdad para Terraform de `infra/aws`: el archivo `s3://<TF_STATE_BUCKET>/config/aws.tfvars` (HCL, en el bucket de state, con versionado). Lo usan por igual `make deploy` (local) y `deploy.yml` / `ci.yml` (GitHub Actions), que lo descargan y lo pasan con `-var-file`. No hay variables de Terraform en `.env` ni en el fork.
+
+Contenido típico:
+
+```hcl
+prefix                 = "bigdata"
+aws_region             = "us-east-2"
+alert_email            = "tu-correo@ejemplo.com"
+enable_glue            = true
+enable_airflow         = true
+snowflake_iam_user_arn = "arn:aws:iam::...:user/..."   # lo pone make snowflake
+snowflake_external_id  = "..."                          # lo pone make snowflake
+```
+
+- `make config`: muestra el archivo.
+- `make airflow-habilitar` / `make airflow-deshabilitar`: cambian `enable_airflow` y despliegan. Apagar Airflow destruye la VM: el deploy lo exige con `CONFIRMAR_DESTRUCCION=true make airflow-deshabilitar`.
+- `make snowflake`: copia los outputs de Snowflake. Con `SIN_DEPLOY=true` solo actualiza el archivo.
+- Guardia de destrucción: `make deploy` y `deploy.yml` muestran el plan y abortan si elimina o reemplaza recursos, salvo que lo confirmes (`CONFIRMAR_DESTRUCCION=true` o el input `confirmar_destruccion` en el workflow manual). `make destroy` no usa esta guardia.
+- Si el archivo no existe, `make deploy` falla con "Falta la configuración en S3. Corre 'make setup' en Code Editor."
 
 ## Targets de `make`
 
@@ -84,12 +105,15 @@ Ejecuta `make help` para ver la lista actualizada.
 
 | Target | Qué hace |
 |---|---|
-| `make setup` | Verifica herramientas, crea `.venv`, valida la región de Snowflake, alinea `AWS_REGION` y guarda `ALERT_EMAIL` en `.env` |
+| `make setup` | Verifica herramientas, crea `.venv`, valida la región de Snowflake, alinea `AWS_REGION` y crea la configuración de AWS en S3 si no existe |
+| `make config` | Muestra la configuración de AWS guardada en S3 |
 | `make doctor` | Diagnóstico: versiones, AWS, Snowflake, Terraform, OIDC |
 | `make estado` | Estado de Airflow, últimos job runs de Glue, warehouse y costos |
 | `make test` | `ruff check`, `ruff format --check`, `pytest` (y tests de DAGs si Airflow está instalado) |
 | `make run-local` | Pipeline en local (`STEP=bronze\|silver\|gold\|all`, `MES=YYYY-MM`) |
-| `make deploy` | `terraform apply` de `infra/aws` y sincronización de código, DAGs y framework a S3 |
+| `make deploy` | `terraform apply` de `infra/aws` (con la guardia de destrucción) y sincronización de código, DAGs y framework a S3 |
+| `make snowflake` | `terraform apply` de `infra/snowflake`, guarda sus outputs en S3 y aplica la fase 2 de AWS (`SIN_DEPLOY=true` omite el deploy) |
+| `make airflow-habilitar` / `make airflow-deshabilitar` | `enable_airflow` = true / false en S3 y `make deploy` |
 | `make airflow-on` / `make airflow-off` | Enciende / apaga la VM de Airflow |
 | `make airflow-tunel` | Túnel SSM `localhost:8080` -> Airflow |
 | `make airflow-password` | Usuario y contraseña de Airflow (Secrets Manager) |
@@ -116,7 +140,9 @@ Estimaciones aproximadas; verifica precios vigentes en la consola de AWS y de Sn
 | El stack falla con `EntityAlreadyExists` (OIDC) | La cuenta ya tiene el proveedor de GitHub: relanza el stack con `ExistingGitHubOidcProviderArn` ([docs/bootstrap.md](docs/bootstrap.md)) |
 | GitHub Actions: `Not authorized to perform sts:AssumeRoleWithWebIdentity` | Revisa `AWS_ROLE_ARN` y los IDs numéricos del bootstrap. Ejecuta el workflow **Debug OIDC** y compara el claim `sub` |
 | `make setup` dice que Snowflake no está en AWS | Crea otra cuenta trial eligiendo AWS y `us-east-2` |
-| `deploy.yml` falla pidiendo `ALERT_EMAIL` o `TF_STATE_BUCKET` | Crea esos secrets o variables en el fork |
+| `ci.yml` o `deploy.yml` fallan pidiendo `AWS_ROLE_ARN` o `TF_STATE_BUCKET` | Crea esos secrets en el fork (en PRs desde forks el plan se omite a propósito) |
+| `Falta la configuración en S3. Corre 'make setup' en Code Editor.` | Corre `make setup` en el Code Editor; crea `config/aws.tfvars` |
+| `El plan destruye recursos` en el deploy | Revisa la lista del plan. Si es intencional (p. ej. apagar Airflow), repite con `CONFIRMAR_DESTRUCCION=true` o el input `confirmar_destruccion` |
 | `AccessDenied` al lanzar jobs Glue o encender la VM | Probablemente actuó el presupuesto: `make estado` y `make desbloquear` |
 | Terraform: `AccessDenied` al crear un rol IAM | El rol debe llevar la boundary `<prefix>-boundary` (`permissions_boundary_arn`) |
 | Un job Glue falla con `ModuleNotFoundError: pipeline` | Falta subir el código: `make deploy` (sube `pipeline.zip` con la carpeta `pipeline/`) |

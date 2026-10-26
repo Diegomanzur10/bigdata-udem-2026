@@ -69,7 +69,9 @@ En la pestaña **Outputs** del stack:
 | `StudioConsoleUrl` | Abrir SageMaker Studio |
 | `SageMakerExecutionRoleArn` | Solo referencia |
 
-Los secrets se configuran en tu fork: **Settings > Secrets and variables > Actions**. Además crea `ALERT_EMAIL` (secret o variable): el correo que recibe las alertas de presupuesto de Terraform (el mismo `AlertEmail` del paso 3). Sin él, `deploy.yml` falla con un mensaje claro. Opcionales como variables del repo: `ENABLE_AIRFLOW=true` (crea la VM de Airflow) y, tras la fase 2 de Snowflake, `SNOWFLAKE_IAM_USER_ARN` y `SNOWFLAKE_EXTERNAL_ID` (ver `infra/snowflake/README.md`). Los secrets de Snowflake se configuran aparte.
+Los secrets se configuran en tu fork: **Settings > Secrets and variables > Actions**: `AWS_ROLE_ARN` (output `GitHubActionsRoleArn`) y `TF_STATE_BUCKET` (output `TfStateBucket`). Sin ellos, `ci.yml` y `deploy.yml` fallan con un mensaje claro (en PRs desde forks el plan se omite a propósito). Los secrets de Snowflake se configuran aparte.
+
+La configuración de Terraform (correo de alertas del paso 3 = `AlertEmail`, Airflow, Glue y la fase 2 de Snowflake) no va en GitHub: `make setup` la guarda en `s3://<TfStateBucket>/config/aws.tfvars` (ver [README](../README.md#configuración-por-estudiante)).
 
 ## 5. Abrir Code Editor
 

@@ -64,7 +64,7 @@ variable "permissions_boundary_arn" {
 }
 
 variable "alert_email" {
-  description = "Correo para las alertas de Budgets. No versionar el valor real. En CI/deploy llega por TF_VAR_alert_email (secret o variable ALERT_EMAIL)."
+  description = "Correo para las alertas de Budgets. No versionar el valor real. En deploy y CI llega desde s3://<state>/config/aws.tfvars (-var-file)."
   type        = string
 
   validation {

@@ -18,8 +18,9 @@ Outputs: `GitHubActionsRoleArn`, `TfStateBucket`, `PermissionsBoundaryArn`, `Sag
 
 ## Terraform AWS (`infra/aws/`)
 Backend S3 `use_lockfile = true`, bucket = output `TfStateBucket`, key `aws/terraform.tfstate`.
-Módulos: `modules/lake`, `modules/glue`, `modules/airflow_vm`, `modules/guardrails`. Flags: `enable_glue` (default true), `enable_airflow` (default false). En `make deploy` y en CI no se usa `terraform.tfvars` (no se versiona): las variables llegan por entorno con `-var` / `TF_VAR_*`:
-`ALERT_EMAIL` (`alert_email`, obligatoria; secret o variable del repo en CI, `.env` en local), `ENABLE_GLUE`, `ENABLE_AIRFLOW`, `SNOWFLAKE_IAM_USER_ARN` y `SNOWFLAKE_EXTERNAL_ID` (fase 2 de la integración; variables del repo en CI). Si la fase 2 no se pasa en CI, un apply revertiría la trust policy del rol de Snowflake a la fase 1.
+Módulos: `modules/lake`, `modules/glue`, `modules/airflow_vm`, `modules/guardrails`. Flags: `enable_glue` (default true), `enable_airflow` (default false).
+Configuración por estudiante (fuente única de verdad): `s3://<TF_STATE_BUCKET>/config/aws.tfvars` (HCL, bucket de state con versionado). `make deploy`, `make snowflake`, `deploy.yml` y `ci.yml` la descargan (`config_pull` en `scripts/lib.sh`) y la pasan con `-var-file`; no se usan `-var` ni `TF_VAR_*` para estas variables, ni `terraform.tfvars`. Claves: `prefix`, `aws_region`, `alert_email` (obligatoria), `enable_glue`, `enable_airflow`, `snowflake_iam_user_arn` y `snowflake_external_id` (fase 2 de la integración; si faltan, la trust policy del rol de Snowflake queda en fase 1). Funciones de `lib.sh`: `config_pull`, `config_push`, `config_set clave valor` (actualiza o agrega preservando las demás).
+Guardia de destrucción: `make deploy` y `deploy.yml` generan el plan con `-out`, lo revisan con `terraform show -json` y abortan si hay acciones `delete` (también reemplazos), salvo `CONFIRMAR_DESTRUCCION=true` (script) o el input `confirmar_destruccion` (workflow manual). `make destroy` no la usa.
 - Variable `permissions_boundary_arn` (default: `arn:aws:iam::<cuenta>:policy/${prefix}-boundary`): la llevan TODOS los `aws_iam_role` que crea Terraform (`snowflake-s3`, `glue-exec`, `airflow-vm`, `airflow-stop-scheduler`, `budgets-action`).
 - Lake bucket: `${prefix}-lake-${account_id}-${region}` con prefijos `bronze/ silver/ gold/ code/ dags/ logs/ tmp/`.
 - Glue database: `${prefix}_lake`. Athena workgroup `${prefix}-wg` con límite de 1 GB escaneado por consulta.
@@ -55,12 +56,13 @@ Provider `snowflakedb/snowflake` ~> 2.x, auth `SNOWFLAKE_JWT`. Backend S3 key `s
 - DAG ejemplo `dags/pipeline_taxi.py` con params `mes`, `env`, `engine`. Rama Glue: bronze → silver → gold → `cargar_gold` (COPY a Snowflake). Rama opcional `snowpark_connect`: escribe directo las tablas en Snowflake y no pasa por `cargar_gold`.
 
 ## GitHub Actions (`.github/workflows/`) y secrets
-Secrets: `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PRIVATE_KEY`, y `ALERT_EMAIL` (secret o variable; correo de Budgets).
-Variables del repo (opcionales): `PREFIX`, `ENABLE_GLUE`, `ENABLE_AIRFLOW`, `SNOWFLAKE_IAM_USER_ARN`, `SNOWFLAKE_EXTERNAL_ID`.
-Workflows: `ci.yml` (PR: ruff lint y formato, pytest, pytest de DAGs, terraform fmt/validate/plan), `deploy.yml` (main/dispatch: apply + empaquetar src → zip + sync dags/code/framework a S3), `airflow-on.yml`, `airflow-off.yml`, `permitir-ip.yml`, `quitar-ips.yml`, `debug-oidc.yml`. Acción `aws-actions/configure-aws-credentials@v6.3.0` (versiones verificadas contra GitHub en Fase 3).
+Secrets: `AWS_ROLE_ARN`, `TF_STATE_BUCKET`, `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PRIVATE_KEY` (estos últimos reservados; los workflows actuales no los usan).
+Variables del repo (opcionales): `PREFIX`. La configuración de Terraform (alert_email, enable_*, fase 2 de Snowflake) no está en GitHub: vive en S3 (ver Terraform AWS).
+`ci.yml` (PR): ruff lint y formato, pytest, pytest de DAGs, terraform fmt/validate; el job `terraform-plan` falla si faltan `AWS_ROLE_ARN` o `TF_STATE_BUCKET` y solo se omite en PRs desde forks (con aviso).
+Workflows: `ci.yml` (PR: ruff lint y formato, pytest, pytest de DAGs, terraform fmt/validate/plan), `deploy.yml` (main/dispatch: falla si faltan los secrets, descarga la configuración, plan, guardia de destrucción, apply + empaquetar src → zip + sync dags/code/framework a S3), `airflow-on.yml`, `airflow-off.yml`, `permitir-ip.yml`, `quitar-ips.yml`, `debug-oidc.yml`. Acción `aws-actions/configure-aws-credentials@v6.3.0` (versiones verificadas contra GitHub en Fase 3).
 - `permitir-ip.yml`: regla IPv4 `/32` en tcp/8080 del SG `${prefix}-airflow-sg`; descripción `etiqueta;fecha` (fecha ISO UTC; `;` y no `|`, que AWS no admite en descripciones); máximo 3 reglas (`MAX_REGLAS`), al superarlo se revoca la más antigua por fecha. `quitar-ips.yml` revoca una IP o todas.
 
 ## Makefile
-`setup`, `doctor`, `estado`, `test`, `run-local`, `deploy`, `airflow-on`, `airflow-off`, `airflow-tunel`, `airflow-password`, `desbloquear`, `snowflake-ampliar-cuota`, `destroy` (+ `help`).
-`.env` (no versionado) guarda `PREFIX`, `AWS_REGION`, `ALERT_EMAIL` y, opcionalmente, `ENABLE_AIRFLOW`, `ENABLE_GLUE`, `SNOWFLAKE_IAM_USER_ARN`, `SNOWFLAKE_EXTERNAL_ID`; `scripts/lib.sh` lo lee (el entorno tiene prioridad).
+`setup`, `config`, `doctor`, `estado`, `test`, `run-local`, `deploy`, `snowflake`, `airflow-on`, `airflow-off`, `airflow-habilitar`, `airflow-deshabilitar`, `airflow-tunel`, `airflow-password`, `desbloquear`, `snowflake-ampliar-cuota`, `destroy` (+ `help`).
+`.env` (no versionado) guarda solo `PREFIX` y `AWS_REGION`; `scripts/lib.sh` lo lee (el entorno tiene prioridad). `ALERT_EMAIL`, `ENABLE_*` y `SNOWFLAKE_*` ya no se leen de `.env`: van en `config/aws.tfvars`.
 `make destroy`: vacía el lake, destruye infra/snowflake y luego infra/aws; opcionalmente (segunda confirmación) borra el stack de bootstrap y vacía/borra el bucket de state versionado.

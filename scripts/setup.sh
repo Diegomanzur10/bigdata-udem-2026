@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Verifica herramientas, valida la región de Snowflake y alinea AWS_REGION (.env).
+# Verifica herramientas, valida la región de Snowflake, alinea AWS_REGION (.env) y crea la
+# configuración de AWS en S3 (config/aws.tfvars) si todavía no existe.
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -48,16 +49,30 @@ fi
 
 set_env_var PREFIX "$PREFIX"
 set_env_var AWS_REGION "$AWS_REGION"
-
-# Correo de alertas de Budgets (variable alert_email de Terraform). Se guarda en .env (no versionado).
-if [[ -z "${ALERT_EMAIL:-}" && -t 0 ]]; then
-  read -r -p "Correo para las alertas de presupuesto (ALERT_EMAIL): " ALERT_EMAIL
-fi
-if [[ -n "${ALERT_EMAIL:-}" ]]; then
-  [[ "$ALERT_EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] || error "ALERT_EMAIL no es un correo válido: $ALERT_EMAIL"
-  set_env_var ALERT_EMAIL "$ALERT_EMAIL"
-else
-  aviso "ALERT_EMAIL sin definir: 'make deploy' lo exige (agrégalo a .env o a infra/aws/terraform.tfvars)."
-fi
 msg "Configuración guardada en .env (PREFIX=$PREFIX, AWS_REGION=$AWS_REGION)"
+
+# Configuración de Terraform (infra/aws) en S3: fuente única de verdad. Si ya existe no se toca.
+msg "Configuración de AWS en S3 ($(config_uri))"
+if config_existe; then
+  msg "Ya existe; no se modifica. Revísala con 'make config'."
+else
+  if [[ -z "${ALERT_EMAIL:-}" && -t 0 ]]; then
+    read -r -p "Correo para las alertas de presupuesto (alert_email): " ALERT_EMAIL
+  fi
+  [[ -n "${ALERT_EMAIL:-}" ]] || error "Falta el correo de alertas. Ejecuta 'make setup' desde una terminal interactiva."
+  [[ "$ALERT_EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] || error "El correo de alertas no es válido: $ALERT_EMAIL"
+
+  CONFIG_TMP="$(mktemp)"
+  cat > "$CONFIG_TMP" <<EOF
+# Configuración de infra/aws (fuente única de verdad). Ver 'make config' y CONTRATO.md.
+prefix         = "$PREFIX"
+aws_region     = "$AWS_REGION"
+alert_email    = "$ALERT_EMAIL"
+enable_glue    = true
+enable_airflow = false
+EOF
+  config_push "$CONFIG_TMP"
+  rm -f "$CONFIG_TMP"
+  msg "Configuración creada en S3 (enable_glue=true, enable_airflow=false)."
+fi
 msg "Setup completado. Siguiente paso: make doctor"

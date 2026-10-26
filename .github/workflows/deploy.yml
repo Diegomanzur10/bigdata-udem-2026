@@ -9,6 +9,10 @@ on:
         description: "true ejecuta terraform apply; false solo plan (la sincronización de código se hace igual)"
         type: boolean
         default: true
+      confirmar_destruccion:
+        description: "true permite aplicar un plan que elimina o reemplaza recursos (sin esto, el deploy aborta)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,21 +35,26 @@ jobs:
       id-token: write
     env:
       TF_IN_AUTOMATION: "true"
-      TF_VAR_prefix: ${{ vars.PREFIX || 'bigdata' }}
-      TF_VAR_aws_region: us-east-2
-      # Correo de alertas: secret o variable ALERT_EMAIL del repo (obligatorio).
-      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL || vars.ALERT_EMAIL }}
-      # Flags y fase 2 de Snowflake: variables del repo (Settings > Secrets and variables > Actions > Variables).
-      TF_VAR_enable_glue: ${{ vars.ENABLE_GLUE || 'true' }}
-      TF_VAR_enable_airflow: ${{ vars.ENABLE_AIRFLOW || 'false' }}
-      TF_VAR_snowflake_iam_user_arn: ${{ vars.SNOWFLAKE_IAM_USER_ARN }}
-      TF_VAR_snowflake_external_id: ${{ vars.SNOWFLAKE_EXTERNAL_ID }}
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
       # En push a main siempre se aplica; en dispatch depende del input.
       APPLY: ${{ github.event_name == 'push' || inputs.apply }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+
+      - name: Comprobar secrets de AWS
+        env:
+          ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          faltan=""
+          if [ -z "$ROLE_ARN" ]; then faltan="AWS_ROLE_ARN"; fi
+          if [ -z "$TF_STATE_BUCKET" ]; then faltan="$faltan TF_STATE_BUCKET"; fi
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan los secrets:${faltan}. Créalos en Settings > Secrets and variables > Actions (outputs GitHubActionsRoleArn y TfStateBucket del bootstrap)."
+            exit 1
+          fi
 
       - uses: hashicorp/setup-terraform@v4
         with:
@@ -58,26 +67,20 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Resolver bucket del lake
-        env:
-          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
         run: |
           set -euo pipefail
-          if [ -z "${TF_VAR_alert_email}" ]; then
-            echo "::error::Falta ALERT_EMAIL. Créalo como secret o variable del repo (correo para las alertas de presupuesto)."
-            exit 1
-          fi
-          if [ -z "${TF_STATE_BUCKET}" ]; then
-            echo "::error::Falta el secret TF_STATE_BUCKET (output TfStateBucket del bootstrap)."
-            exit 1
-          fi
           ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
           echo "LAKE_BUCKET=${PREFIX}-lake-${ACCOUNT_ID}-${AWS_REGION}" >> "$GITHUB_ENV"
           echo "::notice::Modo apply: ${APPLY}"
 
+      - name: Descargar configuración de infra/aws (S3)
+        run: |
+          set -euo pipefail
+          source "$GITHUB_WORKSPACE/scripts/lib.sh"
+          config_pull
+
       - name: Terraform init (infra/aws)
         working-directory: infra/aws
-        env:
-          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
         run: |
           terraform init -input=false -no-color \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
@@ -87,7 +90,16 @@ jobs:
 
       - name: Terraform plan (infra/aws)
         working-directory: infra/aws
-        run: terraform plan -input=false -no-color -lock-timeout=5m -out="${RUNNER_TEMP}/tfplan"
+        run: terraform plan -input=false -no-color -lock-timeout=5m -var-file=config.auto.tfvars -out="${RUNNER_TEMP}/tfplan"
+
+      - name: Guardia de destrucción (infra/aws)
+        working-directory: infra/aws
+        env:
+          CONFIRMAR_DESTRUCCION: ${{ inputs.confirmar_destruccion }}
+        run: |
+          set -euo pipefail
+          source "$GITHUB_WORKSPACE/scripts/lib.sh"
+          guardia_destruccion "${RUNNER_TEMP}/tfplan"
 
       - name: Terraform apply (infra/aws)
         if: env.APPLY == 'true'

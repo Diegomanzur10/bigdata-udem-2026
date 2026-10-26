@@ -15,9 +15,7 @@ El stack de AWS y el de Snowflake dependen uno del otro. El orden es obligatorio
    - `bootstrap/snowflake/gen_key.sh` genera el par de llaves.
    - `bootstrap/snowflake/01_admin.sql` se ejecuta en Snowsight como ACCOUNTADMIN, con la clave pública pegada.
    - `make init`, `make plan`, `make apply`. Anotar los outputs `storage_aws_iam_user_arn` y `storage_aws_external_id`.
-3. **AWS fase 2** (`infra/aws`): pasar esos dos valores a Terraform (trust policy del rol: `Principal` y `sts:ExternalId`) y volver a aplicar. `make deploy` y `deploy.yml` los leen de `SNOWFLAKE_IAM_USER_ARN` y `SNOWFLAKE_EXTERNAL_ID`:
-   - local: agrégalos a `.env` (`SNOWFLAKE_IAM_USER_ARN=...`, `SNOWFLAKE_EXTERNAL_ID=...`) y ejecuta `make deploy`;
-   - GitHub Actions: créalos como **variables** del fork (Settings > Secrets and variables > Actions > Variables). Si no, el siguiente push a `main` devolvería la trust policy a la fase 1 y rompería la integración.
+3. **AWS fase 2** (`infra/aws`): desde la raíz del repo, `make snowflake`. Aplica este stack (`make -C infra/snowflake apply`), lee los dos outputs, los guarda en la configuración de AWS en S3 (`snowflake_iam_user_arn` y `snowflake_external_id`, con `config_set`) y ejecuta `make deploy` para actualizar la trust policy del rol (`Principal` y `sts:ExternalId`). No hay que copiar valores a `.env` ni a variables del fork. Con `SIN_DEPLOY=true make snowflake` solo se actualiza la configuración.
 4. **Resource monitor**: no hay paso adicional. `01_admin.sql` lo asigna a la cuenta (`ALTER ACCOUNT`) y eso cubre a `BIGDATA_WH` desde que existe; Snowflake no permite asignarlo además al warehouse mientras esté a nivel de cuenta.
 
 Snowflake necesita que el rol exista antes de crear la integración, y la trust policy necesita los valores que genera Snowflake. Por eso son dos pasadas.

@@ -9,14 +9,18 @@ AWS_REGION ?= us-east-2
 export PREFIX AWS_REGION
 export PATH := $(CURDIR)/.venv/bin:$(PATH)
 
-.PHONY: help setup doctor estado test run-local deploy airflow-on airflow-off \
+.PHONY: help setup config doctor estado test run-local deploy airflow-on airflow-off \
+	airflow-habilitar airflow-deshabilitar snowflake \
 	airflow-tunel airflow-password desbloquear snowflake-ampliar-cuota destroy
 
 help: ## Muestra los targets disponibles
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-24s %s\n", $$1, $$2}'
 
-setup: ## Verifica herramientas, valida la región de Snowflake y alinea AWS_REGION
+setup: ## Verifica herramientas, alinea AWS_REGION y crea la configuración de AWS en S3 si no existe
 	bash scripts/setup.sh
+
+config: ## Muestra la configuración de AWS guardada en S3 (config/aws.tfvars)
+	bash scripts/config.sh
 
 doctor: ## Diagnóstico: versiones, AWS, Snowflake, Terraform y estado OIDC
 	bash scripts/doctor.sh
@@ -38,6 +42,15 @@ airflow-on: ## Enciende la instancia de Airflow e imprime la URL
 
 airflow-off: ## Apaga la instancia de Airflow
 	bash scripts/airflow-off.sh
+
+airflow-habilitar: ## enable_airflow=true en la configuración de S3 y deploy (crea la VM)
+	bash scripts/airflow-config.sh true
+
+airflow-deshabilitar: ## enable_airflow=false en S3 y deploy (destruye la VM; exige CONFIRMAR_DESTRUCCION=true)
+	bash scripts/airflow-config.sh false
+
+snowflake: ## Apply de infra/snowflake, guarda sus outputs en S3 y aplica la fase 2 de AWS (SIN_DEPLOY=true omite el deploy)
+	bash scripts/snowflake.sh
 
 airflow-tunel: ## Túnel SSM localhost:8080 -> Airflow (y URL del proxy de Studio)
 	bash scripts/airflow-tunel.sh
