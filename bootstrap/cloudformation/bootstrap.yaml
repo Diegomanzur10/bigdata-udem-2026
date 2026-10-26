@@ -454,11 +454,12 @@ Resources:
 
   CodeEditorSpace:
     Type: AWS::SageMaker::Space
+    DependsOn: StudentUserProfile
     Properties:
       DomainId: !GetAtt SageMakerDomain.DomainId
       SpaceName: dev
       OwnershipSettings:
-        OwnerUserProfileName: !Ref StudentUserProfile
+        OwnerUserProfileName: estudiante
       SpaceSharingSettings:
         SharingType: Private
       SpaceSettings:
