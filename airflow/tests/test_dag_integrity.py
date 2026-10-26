@@ -84,3 +84,11 @@ def test_dag_is_manual_with_params(dag):
     assert dag.params["mes"] == "2024-01"
     assert dag.params["env"] == "dev"
     assert dag.params["engine"] == "glue"
+
+
+def test_glue_tasks_pasan_worker_type_y_numero_de_workers(dag):
+    # StartJobRun falla con "Please set both Worker Type and Number of Workers" si falta uno.
+    for task_id in ("bronze", "silver", "gold"):
+        kwargs = dag.get_task(task_id).run_job_kwargs
+        assert kwargs["WorkerType"] == "G.1X"
+        assert kwargs["NumberOfWorkers"] >= 2

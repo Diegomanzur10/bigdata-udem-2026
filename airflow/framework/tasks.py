@@ -101,6 +101,8 @@ def glue_task(
         job_name=job_name,
         script_args={"--step": step, "--env": env, "--mes": mes},
         run_job_kwargs={
+            # StartJobRun exige WorkerType junto con NumberOfWorkers (los jobs son G.1X).
+            "WorkerType": "G.1X",
             "NumberOfWorkers": cfg["number_of_workers"],
             "Timeout": cfg["timeout"],
         },

@@ -11,13 +11,18 @@ info() { echo "[INFO]   $*"; }
 msg "Herramientas y versiones"
 for cmd in python3 java aws terraform snow jq zip; do
   if command -v "$cmd" >/dev/null 2>&1; then
+    # En macOS /usr/bin/java existe aunque no haya JDK (sale con error): no abortar el diagnóstico.
     case "$cmd" in
-      java) version="$(java -version 2>&1 | head -1)" ;;
-      terraform) version="$(terraform version | head -1)" ;;
-      python3) version="$(python3 --version 2>&1)" ;;
-      *) version="$("$cmd" --version 2>&1 | head -1)" ;;
+      java) version="$(java -version 2>&1 | head -1)" || version="" ;;
+      terraform) version="$(terraform version | head -1)" || version="" ;;
+      python3) version="$(python3 --version 2>&1)" || version="" ;;
+      *) version="$("$cmd" --version 2>&1 | head -1)" || version="" ;;
     esac
-    ok "$cmd: $version"
+    if [[ "$cmd" == java && "$version" != *version* ]]; then
+      fallo "java no funciona (¿falta instalar Java 17?): $version"
+    else
+      ok "$cmd: $version"
+    fi
   else
     fallo "$cmd no instalado"
   fi
