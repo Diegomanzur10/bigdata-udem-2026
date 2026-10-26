@@ -2,7 +2,7 @@
 
 Infraestructura de Snowflake del curso: warehouse `BIGDATA_WH`, base `BIGDATA` (esquemas `BRONZE`, `SILVER`, `GOLD`), rol `BIGDATA_DEV`, integración S3 `BIGDATA_S3_INT` y stage `BIGDATA.GOLD.LAKE_GOLD` sobre `s3://<lake>/gold/`.
 
-Terraform >= 1.10, provider `snowflakedb/snowflake` ~> 2.0, autenticación por key-pair (`SNOWFLAKE_JWT`). El resource monitor `BIGDATA_RM` lo crea y asigna `bootstrap/snowflake/01_admin.sql` con ACCOUNTADMIN, no Terraform (asignar un monitor requiere ACCOUNTADMIN; el warehouse lo ignora con `ignore_changes`).
+Terraform >= 1.10, provider `snowflakedb/snowflake` ~> 2.0, autenticación por key-pair (`SNOWFLAKE_JWT`). El resource monitor `BIGDATA_RM` lo crea y asigna a la cuenta `bootstrap/snowflake/01_admin.sql` con ACCOUNTADMIN, no Terraform (asignar un monitor requiere ACCOUNTADMIN; el warehouse lo ignora con `ignore_changes`).
 
 `BIGDATA_DEV` recibe USAGE/CREATE en los schemas y `SELECT` sobre las tablas y vistas futuras (`FUTURE TABLES` / `FUTURE VIEWS`) de BRONZE, SILVER y GOLD.
 
@@ -18,7 +18,7 @@ El stack de AWS y el de Snowflake dependen uno del otro. El orden es obligatorio
 3. **AWS fase 2** (`infra/aws`): pasar esos dos valores a Terraform (trust policy del rol: `Principal` y `sts:ExternalId`) y volver a aplicar. `make deploy` y `deploy.yml` los leen de `SNOWFLAKE_IAM_USER_ARN` y `SNOWFLAKE_EXTERNAL_ID`:
    - local: agrégalos a `.env` (`SNOWFLAKE_IAM_USER_ARN=...`, `SNOWFLAKE_EXTERNAL_ID=...`) y ejecuta `make deploy`;
    - GitHub Actions: créalos como **variables** del fork (Settings > Secrets and variables > Actions > Variables). Si no, el siguiente push a `main` devolvería la trust policy a la fase 1 y rompería la integración.
-4. **Resource monitor al warehouse**: volver a ejecutar `bootstrap/snowflake/01_admin.sql` como ACCOUNTADMIN (idempotente). Su `ALTER WAREHOUSE IF EXISTS BIGDATA_WH SET RESOURCE_MONITOR = BIGDATA_RM` solo surte efecto cuando el warehouse ya existe (tras el `make apply`). El límite de cuenta (`ALTER ACCOUNT`) ya protege desde la primera ejecución.
+4. **Resource monitor**: no hay paso adicional. `01_admin.sql` lo asigna a la cuenta (`ALTER ACCOUNT`) y eso cubre a `BIGDATA_WH` desde que existe; Snowflake no permite asignarlo además al warehouse mientras esté a nivel de cuenta.
 
 Snowflake necesita que el rol exista antes de crear la integración, y la trust policy necesita los valores que genera Snowflake. Por eso son dos pasadas.
 

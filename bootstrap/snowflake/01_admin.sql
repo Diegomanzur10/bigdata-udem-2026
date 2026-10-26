@@ -63,11 +63,9 @@ CREATE USER IF NOT EXISTS IDENTIFIER($user_tf)
 GRANT ROLE IDENTIFIER($role_tf) TO USER IDENTIFIER($user_tf);
 
 
--- 4) Asignación del monitor al warehouse BIGDATA_WH (lo crea Terraform en infra/snowflake).
---    Orden: ejecutar este script -> make apply en infra/snowflake -> volver a ejecutar SOLO esta
---    línea (o el script completo: es idempotente). Con IF EXISTS no falla en la primera pasada.
---    Aunque se omita, ALTER ACCOUNT del paso 1 ya aplica el límite a todos los warehouses.
-ALTER WAREHOUSE IF EXISTS BIGDATA_WH SET RESOURCE_MONITOR = BIGDATA_RM;
+-- 4) El resource monitor ya aplica a TODOS los warehouses por el ALTER ACCOUNT del paso 1.
+--    No se asigna al warehouse BIGDATA_WH: Snowflake lo rechaza ("currently set at the account level").
+--    Este script es idempotente: no hace falta volver a ejecutarlo tras 'make apply'.
 
 
 -- 5) Verificación final.

@@ -1,7 +1,7 @@
 # Recursos de Snowflake del curso. Nombres fijos según CONTRATO.md.
 # BIGDATA_RM NO lo crea ni lo asigna Terraform: lo crea bootstrap/snowflake/01_admin.sql con
-# ACCOUNTADMIN, que además lo asigna a la cuenta (ALTER ACCOUNT) y, tras el primer apply de este
-# stack, al warehouse (ALTER WAREHOUSE IF EXISTS ... en el mismo script, se vuelve a ejecutar).
+# ACCOUNTADMIN, que lo asigna a la cuenta (ALTER ACCOUNT): aplica a todos los warehouses, incluido
+# BIGDATA_WH. Snowflake no deja asignarlo además al warehouse mientras esté a nivel de cuenta.
 # Asignar un resource monitor requiere ACCOUNTADMIN; por eso el warehouse lo ignora en lifecycle.
 
 # ---------- Warehouse y base ----------
@@ -15,7 +15,7 @@ resource "snowflake_warehouse" "bigdata" {
   comment             = "Warehouse XS del curso Big Data"
 
   lifecycle {
-    # Lo asigna 01_admin.sql con ACCOUNTADMIN; sin esto Terraform intentaría quitarlo.
+    # Lo gestiona 01_admin.sql con ACCOUNTADMIN (a nivel de cuenta); sin esto Terraform intentaría quitarlo.
     ignore_changes = [resource_monitor]
   }
 }

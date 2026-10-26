@@ -33,7 +33,7 @@ Módulos: `modules/lake`, `modules/glue`, `modules/airflow_vm`, `modules/guardra
 ## Terraform Snowflake (`infra/snowflake/`)
 Provider `snowflakedb/snowflake` ~> 2.x, auth `SNOWFLAKE_JWT`. Backend S3 key `snowflake/terraform.tfstate`.
 - Warehouse `${PREFIX}_WH` XSMALL, auto_suspend 60. Database `${PREFIX}`; schemas `BRONZE`, `SILVER`, `GOLD`.
-- Resource monitor `${PREFIX}_RM` (60 créditos, notify 50/80, suspend_immediate 100) — creado y asignado (cuenta y warehouse) por `bootstrap/snowflake/01_admin.sql` con ACCOUNTADMIN; Terraform no lo asigna (el warehouse ignora `resource_monitor`). Orden: 01_admin.sql → `make apply` de infra/snowflake → re-ejecutar 01_admin.sql (el `ALTER WAREHOUSE IF EXISTS` asigna el monitor).
+- Resource monitor `${PREFIX}_RM` (60 créditos, notify 50/80, suspend_immediate 100) — creado y asignado a la cuenta (`ALTER ACCOUNT`, cubre a todos los warehouses) por `bootstrap/snowflake/01_admin.sql` con ACCOUNTADMIN; Terraform no lo asigna (el warehouse ignora `resource_monitor`). Snowflake rechaza asignarlo además al warehouse mientras esté a nivel de cuenta, así que 01_admin.sql se ejecuta una sola vez.
 - Rol `BIGDATA_DEV`: USAGE en warehouse/database/schemas, CREATE TABLE/VIEW/STAGE/FILE FORMAT en schemas, USAGE+READ sobre el stage y SELECT sobre FUTURE TABLES / FUTURE VIEWS de BRONZE, SILVER y GOLD.
 - Storage integration `${PREFIX}_S3_INT` en dos fases (rol IAM `${prefix}-snowflake-s3` creado en infra/aws con trust placeholder → actualizado con `STORAGE_AWS_IAM_USER_ARN` / `EXTERNAL_ID`). Stage `${PREFIX}.GOLD.LAKE_GOLD` → `s3://<lake>/gold/`.
 

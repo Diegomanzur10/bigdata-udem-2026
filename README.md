@@ -73,7 +73,6 @@ Haz los pasos en este orden.
     1. `bootstrap/snowflake/gen_key.sh` genera la llave; pega la clave pública en `bootstrap/snowflake/01_admin.sql` y ejecútalo en Snowsight como `ACCOUNTADMIN` (crea el resource monitor y el usuario `TERRAFORM_SVC`).
     2. En `infra/snowflake`: `cp terraform.tfvars.example terraform.tfvars`, `cp backend.hcl.example backend.hcl`, completa los valores y ejecuta `make init plan apply`. Anota `make outputs`.
     3. Pasa `storage_aws_iam_user_arn` y `storage_aws_external_id` a AWS como `SNOWFLAKE_IAM_USER_ARN` y `SNOWFLAKE_EXTERNAL_ID` (`.env` y variables del fork) y vuelve a ejecutar `make deploy`.
-    4. Vuelve a ejecutar `01_admin.sql` para asignar el resource monitor al warehouse.
 
     Detalle: [infra/snowflake/README.md](infra/snowflake/README.md).
 
