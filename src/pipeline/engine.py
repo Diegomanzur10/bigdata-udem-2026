@@ -3,12 +3,14 @@
 - local: SparkSession local[*] con 2 GB de driver.
 - glue: GlueContext sobre el SparkContext del job (si awsglue no está, SparkSession genérica).
 - snowpark_connect: Snowpark Connect for Spark; warehouse y database vienen de la conexión
-  de Snowflake, no se configuran aquí.
+  de Snowflake (connections.toml) o de SNOWFLAKE_DATABASE / SNOWFLAKE_SCHEMA / SNOWFLAKE_WAREHOUSE /
+  SNOWFLAKE_ROLE / SNOWFLAKE_CONNECTION_NAME si están definidas. Se requiere database y schema.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 
 from pyspark.sql import SparkSession
 
@@ -48,11 +50,31 @@ def _glue() -> SparkSession:
     return GlueContext(SparkContext.getOrCreate()).spark_session
 
 
+def _parametros_snowflake() -> dict[str, str]:
+    """Parámetros de conexión opcionales desde el entorno (si no, connections.toml manda).
+
+    SNOWFLAKE_CONNECTION_NAME (o SNOWFLAKE_DEFAULT_CONNECTION_NAME), SNOWFLAKE_DATABASE,
+    SNOWFLAKE_SCHEMA, SNOWFLAKE_WAREHOUSE y SNOWFLAKE_ROLE. Útil porque Snowpark Connect
+    necesita una base de datos y un schema en la sesión (para el stage de la sesión) y muchas
+    conexiones de `snow` no los traen.
+    """
+    nombre = os.environ.get("SNOWFLAKE_CONNECTION_NAME") or os.environ.get(
+        "SNOWFLAKE_DEFAULT_CONNECTION_NAME"
+    )
+    params = {"connection_name": nombre} if nombre else {}
+    for clave in ("database", "schema", "warehouse", "role"):
+        valor = os.environ.get(f"SNOWFLAKE_{clave.upper()}")
+        if valor:
+            params[clave] = valor
+    return params
+
+
 def _snowpark_connect() -> SparkSession:
     # Import perezoso: solo existe dentro del entorno de Snowflake.
     from snowflake import snowpark_connect
 
-    spark = snowpark_connect.init_spark_session()
+    params = _parametros_snowflake()
+    spark = snowpark_connect.init_spark_session(connection_parameters=params or None)
     if spark is None:
         spark = SparkSession.builder.getOrCreate()
     return spark

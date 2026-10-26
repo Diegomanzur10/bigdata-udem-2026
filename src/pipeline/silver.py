@@ -61,19 +61,17 @@ def limpiar_viajes(trips: DataFrame, mes: str | None = None) -> DataFrame:
 
 def clima_diario(clima_raw: DataFrame) -> DataFrame:
     """Aplana el bloque 'daily' de Open-Meteo a filas (fecha, lluvia_mm, temp_media_c)."""
-    filas = clima_raw.select(
-        F.explode(
-            F.arrays_zip(
-                F.col("daily.time").alias("fecha"),
-                F.col("daily.precipitation_sum").alias("lluvia"),
-                F.col("daily.temperature_2m_mean").alias("temp"),
-            )
-        ).alias("d")
+    # posexplode + element_at en lugar de explode(arrays_zip(...alias...)): Snowpark Connect
+    # nombra los campos del struct "time AS fecha" y d.fecha deja de resolverse.
+    base = clima_raw.select(
+        F.posexplode(F.col("daily.time")).alias("i", "fecha"),
+        F.col("daily.precipitation_sum").alias("lluvia"),
+        F.col("daily.temperature_2m_mean").alias("temp"),
     )
-    return filas.select(
-        F.to_date("d.fecha").alias("fecha"),
-        F.col("d.lluvia").cast("double").alias("lluvia_mm"),
-        F.col("d.temp").cast("double").alias("temp_media_c"),
+    return base.select(
+        F.to_date("fecha").alias("fecha"),
+        F.element_at("lluvia", F.col("i") + 1).cast("double").alias("lluvia_mm"),
+        F.element_at("temp", F.col("i") + 1).cast("double").alias("temp_media_c"),
     )
 
 
