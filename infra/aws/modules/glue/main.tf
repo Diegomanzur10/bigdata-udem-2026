@@ -127,6 +127,7 @@ resource "aws_glue_job" "this" {
   default_arguments = {
     "--job-language"                     = "python"
     "--extra-py-files"                   = "s3://${var.lake_bucket}/code/pipeline.zip"
+    "--additional-python-modules"        = "pyyaml==6.0.2" # la imagen de Glue 5.0 no trae PyYAML
     "--enable-spark-ui"                  = "true"
     "--spark-event-logs-path"            = "s3://${var.lake_bucket}/logs/spark-ui/"
     "--enable-continuous-cloudwatch-log" = "true"

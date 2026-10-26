@@ -16,3 +16,11 @@ def test_argv_de_glue_fija_engine_y_normaliza_guiones():
         "2024-01",
         "bigdata-lake-x",
     )
+
+
+def test_argv_de_glue_ignora_claves_ajenas_y_valores_none():
+    argv = resueltos_a_argv(
+        {"step": "bronze", "env": "dev", "JOB_NAME": None, "job_bookmark_option": None, "mes": None}
+    )
+    args = build_parser().parse_args(argv)
+    assert (args.step, args.env, args.mes) == ("bronze", "dev", None)

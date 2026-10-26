@@ -20,8 +20,12 @@ OPCIONALES = ("mes", "lake-bucket")
 def resueltos_a_argv(resueltos: dict[str, str]) -> list[str]:
     """Convierte lo que devuelve getResolvedOptions (claves con '_') en argv de pipeline.run."""
     argv: list[str] = ["--engine", "glue"]
+    permitidas = {o.replace("-", "_") for o in (*REQUERIDOS, *OPCIONALES)}
     for clave, valor in resueltos.items():
-        argv += [f"--{clave.replace('_', '-')}", valor]
+        # getResolvedOptions de Glue 5.0 devuelve tambien otras claves (algunas con valor None):
+        # solo se pasan al parser las del pipeline.
+        if clave in permitidas and valor is not None:
+            argv += [f"--{clave.replace('_', '-')}", valor]
     return argv
 
 
@@ -36,4 +40,8 @@ def _argv_glue() -> list[str]:
 
 
 if __name__ == "__main__":
-    sys.exit(main(_argv_glue()))
+    # Glue marca el job como FAILED ("SystemExit: 0") si el script llama sys.exit(0):
+    # solo se sale con codigo distinto de cero.
+    codigo = main(_argv_glue())
+    if codigo:
+        sys.exit(codigo)
