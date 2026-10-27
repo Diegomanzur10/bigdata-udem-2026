@@ -424,6 +424,68 @@ Resources:
   # ---------------------------------------------------------------------------
   # SageMaker Domain, usuario y Space de Code Editor.
   # ---------------------------------------------------------------------------
+  # Herramientas del curso que la imagen de Code Editor no trae (Java 17, Terraform, snow, zip).
+  # Corre en cada arranque del space; lo que va al home persiste, asi que solo descarga la primera vez.
+  CodeEditorToolsLifecycleConfig:
+    Type: AWS::SageMaker::StudioLifecycleConfig
+    Properties:
+      # El contenido de un LCC es inmutable: si cambia el script, sube el sufijo del nombre.
+      StudioLifecycleConfigName: !Sub "${Prefix}-code-editor-tools-v2"
+      StudioLifecycleConfigAppType: CodeEditor
+      StudioLifecycleConfigContent:
+        Fn::Base64: |
+          #!/bin/bash
+          # Nunca debe impedir que arranque el Code Editor: cada paso registra su error y sigue.
+          set -uo pipefail
+          set -x
+          echo "== $(date -u +%FT%TZ) herramientas del curso (usuario: $(id -un))"
+          HOME_DIR=/home/sagemaker-user
+          TF_VERSION=1.17.0
+          OPT="$HOME_DIR/.local/opt"
+          BIN="$HOME_DIR/.local/bin"
+          SUDO=""; [[ "$(id -u)" != 0 ]] && SUDO="sudo"
+          mkdir -p "$OPT" "$BIN"
+          FALLOS=""
+
+          # zip/unzip: paquete del sistema, se pierde al reiniciar el space.
+          if ! command -v zip >/dev/null || ! command -v unzip >/dev/null; then
+            { $SUDO apt-get update -qq && $SUDO apt-get install -y -qq zip unzip; } || FALLOS+=" zip"
+          fi
+
+          if [[ ! -x "$OPT/java17/bin/java" ]]; then
+            { curl -fsSL -o /tmp/corretto17.tar.gz \
+                https://corretto.aws/downloads/latest/amazon-corretto-17-x64-linux-jdk.tar.gz \
+              && tar -xzf /tmp/corretto17.tar.gz -C "$OPT" \
+              && ln -sfn "$(ls -d "$OPT"/amazon-corretto-17* | head -1)" "$OPT/java17"; } || FALLOS+=" java"
+            rm -f /tmp/corretto17.tar.gz
+          fi
+
+          if [[ "$("$BIN/terraform" version 2>/dev/null | head -1)" != "Terraform v$TF_VERSION" ]]; then
+            { curl -fsSL -o /tmp/tf.zip \
+                "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" \
+              && python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extract('terraform', sys.argv[2])" /tmp/tf.zip "$BIN" \
+              && chmod +x "$BIN/terraform"; } || FALLOS+=" terraform"
+            rm -f /tmp/tf.zip
+          fi
+
+          if [[ ! -x "$BIN/snow" ]]; then
+            if [[ "$(id -un)" == sagemaker-user ]]; then
+              python3 -m pip install --user --quiet snowflake-cli || FALLOS+=" snow"
+            else
+              sudo -u sagemaker-user -H python3 -m pip install --user --quiet snowflake-cli || FALLOS+=" snow"
+            fi
+          fi
+
+          PERFIL="$HOME_DIR/.bashrc"
+          if ! grep -q "herramientas del curso" "$PERFIL" 2>/dev/null; then
+            printf '%s\n' '# herramientas del curso (Lifecycle Config)' \
+              'export JAVA_HOME=/home/sagemaker-user/.local/opt/java17' \
+              'export PATH=/home/sagemaker-user/.local/bin:$JAVA_HOME/bin:$PATH' >> "$PERFIL"
+          fi
+          [[ "$(id -u)" == 0 ]] && chown -R sagemaker-user:users "$HOME_DIR/.local" "$PERFIL"
+          echo "== fin; fallos:${FALLOS:- ninguno}" | tee -a "$HOME_DIR/.herramientas-curso.log"
+          exit 0
+
   SageMakerDomain:
     Type: AWS::SageMaker::Domain
     Properties:
@@ -435,6 +497,10 @@ Resources:
       DefaultUserSettings:
         ExecutionRole: !GetAtt SageMakerExecutionRole.Arn
         CodeEditorAppSettings:
+          LifecycleConfigArns:
+            - !GetAtt CodeEditorToolsLifecycleConfig.StudioLifecycleConfigArn
+          DefaultResourceSpec:
+            LifecycleConfigArn: !GetAtt CodeEditorToolsLifecycleConfig.StudioLifecycleConfigArn
           AppLifecycleManagement:
             IdleSettings:
               LifecycleManagement: ENABLED
@@ -467,6 +533,7 @@ Resources:
         CodeEditorAppSettings:
           DefaultResourceSpec:
             InstanceType: ml.t3.medium
+            LifecycleConfigArn: !GetAtt CodeEditorToolsLifecycleConfig.StudioLifecycleConfigArn
         SpaceStorageSettings:
           EbsStorageSettings:
             EbsVolumeSizeInGb: 20

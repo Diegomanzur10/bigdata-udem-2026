@@ -61,8 +61,12 @@ fi
 
 msg "Estado OIDC para GitHub Actions"
 if [[ -n "$CUENTA" ]]; then
-  if aws iam list-open-id-connect-providers --output text 2>/dev/null | grep -q 'token.actions.githubusercontent.com'; then
+  OIDC_OUT="$(aws iam list-open-id-connect-providers --output text 2>&1 || true)"
+  if grep -q 'token.actions.githubusercontent.com' <<< "$OIDC_OUT"; then
     ok "Proveedor OIDC de GitHub existe"
+  elif grep -q 'AccessDenied' <<< "$OIDC_OUT"; then
+    # El rol del Code Editor no puede listar proveedores OIDC; el CI lo comprueba de verdad.
+    info "No se puede listar el proveedor OIDC con este rol (normal en Code Editor)"
   else
     fallo "No existe el proveedor OIDC de GitHub (ejecuta el stack de bootstrap)"
   fi
