@@ -532,7 +532,7 @@ Resources:
         AppType: CodeEditor
         CodeEditorAppSettings:
           DefaultResourceSpec:
-            InstanceType: ml.t3.medium
+            InstanceType: ml.t3.large
             LifecycleConfigArn: !GetAtt CodeEditorToolsLifecycleConfig.StudioLifecycleConfigArn
         SpaceStorageSettings:
           EbsStorageSettings:

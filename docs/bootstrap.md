@@ -3,7 +3,7 @@
 Este paso se hace una sola vez por alumno, desde la consola de AWS, con la cuenta de prueba (región `us-east-2`). Crea con CloudFormation (`bootstrap/cloudformation/bootstrap.yaml`):
 
 - SageMaker Domain en la VPC por defecto, con autenticación IAM y Code Editor.
-- Usuario `estudiante` y Space `dev` (Code Editor, `ml.t3.medium`, 20 GB EBS). Apagado por inactividad a los 60 min.
+- Usuario `estudiante` y Space `dev` (Code Editor, `ml.t3.large` de 8 GB, 20 GB EBS; se puede bajar a `ml.t3.medium` desde Studio). Apagado por inactividad a los 60 min.
 - Rol de ejecución de SageMaker, con permisos para ejecutar Terraform sobre recursos `${prefix}-*`.
 - Proveedor OIDC de GitHub (si no lo tienes ya) y rol `${prefix}-github-actions` para GitHub Actions (sin claves de acceso).
 - Política `${prefix}-boundary` (permissions boundary). Terraform solo puede crear roles `${prefix}-*` que la lleven, y tiene prohibido adjuntar `AdministratorAccess`, quitar el boundary o alterar las políticas de gobierno.
