@@ -1,0 +1,11 @@
+# Entorno local: archivos en ./lake (relativo al directorio de ejecución).
+# muestra.max_rows limita las filas de viajes leídas de bronze (pruebas rápidas).
+entorno: local
+rutas:
+  bronze: ./lake/bronze
+  silver: ./lake/silver
+  gold: ./lake/gold
+muestra:
+  max_rows: 10000
+meses:
+  - "2024-01"
