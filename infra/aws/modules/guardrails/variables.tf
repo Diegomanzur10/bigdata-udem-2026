@@ -15,7 +15,7 @@ variable "alert_email" {
 }
 
 variable "role_names" {
-  description = "Nombres de los roles que reciben la politica Deny al alcanzar el umbral de bloqueo (Airflow y GitHub)."
+  description = "Nombres de los roles que reciben la politica Deny al alcanzar el umbral de bloqueo (GitHub, Code Editor y Airflow)."
   type        = list(string)
 
   validation {

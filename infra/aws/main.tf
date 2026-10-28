@@ -14,9 +14,11 @@ data "aws_caller_identity" "current" {}
 locals {
   permissions_boundary_arn = coalesce(var.permissions_boundary_arn, "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.prefix}-boundary")
 
-  github_role_name     = "${var.prefix}-github-actions"
-  airflow_role_name    = "${var.prefix}-airflow-vm"
-  guardrail_role_names = concat([local.github_role_name], var.enable_airflow ? [local.airflow_role_name] : [])
+  github_role_name    = "${var.prefix}-github-actions"
+  airflow_role_name   = "${var.prefix}-airflow-vm"
+  sagemaker_role_name = "${var.prefix}-sagemaker-exec" # Code Editor (lo crea el bootstrap)
+  # El Deny solo frena cómputo (Glue, EC2): desde Code Editor se puede seguir leyendo, desbloquear y destruir.
+  guardrail_role_names = concat([local.github_role_name, local.sagemaker_role_name], var.enable_airflow ? [local.airflow_role_name] : [])
   glue_job_arns        = var.enable_glue ? module.glue[0].job_arns : []
 }
 
