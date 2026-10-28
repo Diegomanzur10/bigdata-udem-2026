@@ -120,8 +120,11 @@ resource "aws_glue_job" "this" {
     python_version  = "3"
   }
 
+  # Un job a la vez por perfil; los siguientes esperan en cola en vez de fallar.
+  job_run_queuing_enabled = true
+
   execution_property {
-    max_concurrent_runs = 3
+    max_concurrent_runs = 1
   }
 
   default_arguments = {

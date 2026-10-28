@@ -61,6 +61,7 @@ module "guardrails" {
   budget_usd               = var.budget_usd
   alert_email              = var.alert_email
   role_names               = local.guardrail_role_names
+  instance_ids             = var.enable_airflow ? [module.airflow_vm[0].instance_id] : []
   permissions_boundary_arn = local.permissions_boundary_arn
 
   # El rol de Airflow debe existir antes de que Budgets lo referencie.

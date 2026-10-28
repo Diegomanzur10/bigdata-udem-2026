@@ -1,4 +1,5 @@
 data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
@@ -89,6 +90,38 @@ data "aws_iam_policy_document" "budgets_action" {
       values   = [aws_iam_policy.bloqueo.arn]
     }
   }
+
+  dynamic "statement" {
+    for_each = length(var.instance_ids) > 0 ? [1] : []
+    content {
+      sid       = "DetenerVmPorSsm"
+      actions   = ["ec2:StopInstances"]
+      resources = [for i in var.instance_ids : "arn:aws:ec2:${data.aws_region.current.region}:${local.account_id}:instance/${i}"]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = length(var.instance_ids) > 0 ? [1] : []
+    content {
+      sid       = "AutomatizacionSsm"
+      actions   = ["ec2:DescribeInstances", "ec2:DescribeInstanceStatus", "ssm:StartAutomationExecution", "ssm:GetAutomationExecution"]
+      resources = ["*"]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = length(var.instance_ids) > 0 ? [1] : []
+    content {
+      sid       = "PasarseASiMismoASsm"
+      actions   = ["iam:PassRole"]
+      resources = [aws_iam_role.budgets_action.arn]
+      condition {
+        test     = "StringEquals"
+        variable = "iam:PassedToService"
+        values   = ["ssm.amazonaws.com"]
+      }
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "budgets_action" {
@@ -117,6 +150,40 @@ resource "aws_budgets_budget_action" "bloqueo" {
     iam_action_definition {
       policy_arn = aws_iam_policy.bloqueo.arn
       roles      = var.role_names
+    }
+  }
+
+  subscriber {
+    subscription_type = "EMAIL"
+    address           = var.alert_email
+  }
+
+  depends_on = [aws_iam_role_policy.budgets_action]
+}
+
+# ---------------------------------------------------------------------------
+# Accion de Budgets: al mismo umbral detiene la VM de Airflow (si existe) por SSM
+# ---------------------------------------------------------------------------
+
+resource "aws_budgets_budget_action" "detener_vm" {
+  count = length(var.instance_ids) > 0 ? 1 : 0
+
+  budget_name        = aws_budgets_budget.mensual.name
+  action_type        = "RUN_SSM_DOCUMENTS"
+  approval_model     = "AUTOMATIC"
+  notification_type  = "ACTUAL"
+  execution_role_arn = aws_iam_role.budgets_action.arn
+
+  action_threshold {
+    action_threshold_type  = "PERCENTAGE"
+    action_threshold_value = var.action_threshold
+  }
+
+  definition {
+    ssm_action_definition {
+      action_sub_type = "STOP_EC2_INSTANCES"
+      region          = data.aws_region.current.region
+      instance_ids    = var.instance_ids
     }
   }
 

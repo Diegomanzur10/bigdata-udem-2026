@@ -88,7 +88,7 @@ No se pudo validar sin credenciales: `terraform plan`, sintaxis de IAM contra el
 13. **CI**: la instalación de `airflow/requirements.txt` en `ubuntu-latest` con Python 3.11 (tiempo y resolución) y el `terraform plan` en PRs del propio repo.
 
 ### P2: menores
-14. Alertas duplicadas: el bootstrap (`${Prefix}-monthly`, 50/80/100 %) y Terraform (`${prefix}-mensual`, 50/80 %) crean presupuestos distintos. Decidir si se deja así.
+14. ~~Alertas duplicadas~~ Resuelto: `${Prefix}-total` (bootstrap) solo alerta al 100 %; `${prefix}-mensual` (Terraform) alerta al 40/80 % y su acción al 60 % bloquea roles y detiene la VM.
 15. Los secrets `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PRIVATE_KEY` del contrato no los usa ningún workflow (`infra/snowflake` se aplica desde la terminal).
 16. La rama `snowpark_connect` del DAG no funciona en la VM (la imagen no trae `src/` ni el paquete de Snowpark Connect; nombre de paquete no verificado).
 17. Los logs de Glue no aparecen en la UI de Airflow (`verbose=False`); decidir si se amplía el rol de la VM con lectura de `/aws-glue/jobs/*`.

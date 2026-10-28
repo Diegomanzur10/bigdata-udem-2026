@@ -125,7 +125,7 @@ Ejecuta `make help` para ver la lista actualizada.
 
 Estimaciones aproximadas; verifica precios vigentes en la consola de AWS y de Snowflake.
 
-- **Presupuesto**: el bootstrap crea `bigdata-monthly` (50 USD por defecto) con alertas al 50, 80 y 100 %. Terraform crea `bigdata-mensual`: al 60 % de gasto real, AWS Budgets adjunta una política Deny (`bigdata-bloqueo-presupuesto`) que impide iniciar jobs Glue e instancias EC2. Budgets actualiza el gasto como mucho una vez al día, así que no es un tope en tiempo real. Para revertirlo: `make desbloquear`.
+- **Presupuesto**: se mide el gasto bruto (sin descontar créditos del free plan). Terraform crea `bigdata-mensual` (50 USD por defecto) con alertas al 40 y 80 %; al 60 % AWS Budgets adjunta una política Deny (`bigdata-bloqueo-presupuesto`) que impide iniciar jobs Glue e instancias EC2 (CI, Code Editor y VM) y detiene la VM de Airflow. El bootstrap crea `bigdata-total`, que solo alerta al 100 % como red de seguridad. Budgets actualiza el gasto como mucho una vez al día, así que no es un tope en tiempo real. Para revertirlo: `make desbloquear`.
 - **Glue**: se paga por segundo de cómputo de los workers. Los jobs tienen máximo 2, 4 o 6 workers G.1X y tiempos límite de 10, 20 y 30 minutos, y como máximo 3 ejecuciones simultáneas.
 - **Athena**: cada consulta se cancela al pasar de 1 GB escaneado.
 - **VM de Airflow** (opcional): `m7i-flex.large` elegible en el plan gratuito. Se apaga sola a las 23:00 (hora de Bogotá). Apágala con `make airflow-off` cuando termines. La IP elástica pública puede tener un costo pequeño por hora aunque la VM esté apagada.

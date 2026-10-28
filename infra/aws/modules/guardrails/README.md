@@ -6,10 +6,11 @@ Topes de costo sobre la cuenta del alumno: presupuesto mensual con alertas y una
 
 | Recurso | Nombre | Función |
 |---|---|---|
-| `aws_budgets_budget` | `${prefix}-mensual` | Presupuesto COST mensual en USD (`budget_usd`, default 50). Alertas por email al 50 % y 80 % de gasto real. El bootstrap crea además `${Prefix}-monthly` (50/80/100 %): son dos presupuestos distintos y llegarán alertas duplicadas, a propósito (el de bootstrap protege antes de que exista Terraform). |
+| `aws_budgets_budget` | `${prefix}-mensual` | Presupuesto COST mensual en USD (`budget_usd`, default 50). Gasto bruto (sin descontar créditos del free plan). Alertas por email al 40 % y 80 %; al 60 % la acción de bloqueo también avisa. El bootstrap crea además `${Prefix}-total`, que solo alerta al 100 % como red de seguridad del total de la cuenta. |
 | `aws_iam_policy` | `${prefix}-bloqueo-presupuesto` | Deny sobre `glue:StartJobRun`, `ec2:StartInstances` y `ec2:RunInstances`. No se adjunta en Terraform: solo la adjunta Budgets. |
 | `aws_iam_role` | `${prefix}-budgets-action` | Rol de ejecución de Budgets (trust `budgets.amazonaws.com`, lleva la permissions boundary `${prefix}-boundary`). Solo puede adjuntar y quitar la política Deny a los roles de `role_names`. |
 | `aws_budgets_budget_action` | sobre `${prefix}-mensual` | Al 60 % de gasto real (`action_threshold`), adjunta la política Deny a `role_names` (AUTOMATIC) y envía email. |
+| `aws_budgets_budget_action` | `detener_vm` (si hay `instance_ids`) | Al mismo umbral detiene la VM de Airflow con SSM (`STOP_EC2_INSTANCES`, AUTOMATIC). |
 
 `role_names` lo arma el root: el rol de GitHub `${prefix}-github-actions` (bootstrap) y, si `enable_airflow = true`, el rol `${prefix}-airflow-vm`.
 
@@ -28,7 +29,7 @@ El rol de GitHub (`${prefix}-github-actions`) y el de SageMaker los reciben del 
 - `budgets:*` (PowerUserAccess).
 - `iam:PassRole` sobre `${prefix}-*` con `iam:PassedToService = budgets.amazonaws.com` (entre otros servicios).
 - `iam:CreateRole` / `AttachRolePolicy` / `PutRolePolicy` solo con la boundary `${prefix}-boundary`, y creación de políticas `${prefix}-*`.
-- La boundary permite además `iam:AttachRolePolicy` / `DetachRolePolicy` de `${prefix}-bloqueo-presupuesto` sobre roles `${prefix}-*`, que es lo único que hace el rol de la acción.
+- La boundary permite además `iam:AttachRolePolicy` / `DetachRolePolicy` de `${prefix}-bloqueo-presupuesto` sobre roles `${prefix}-*`, que hace el rol de la acción, y `ec2:Describe*` + `iam:PassRole` de `${prefix}-budgets-action` a SSM para detener la VM.
 
 Estos permisos no se verificaron contra cuenta real (no se hizo `plan` ni `apply`): son de la lista de la Fase V.
 

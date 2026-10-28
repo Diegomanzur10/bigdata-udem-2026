@@ -24,14 +24,15 @@ SET user_tf = 'TERRAFORM_SVC';
 SET rm_name = 'BIGDATA_RM';
 
 
--- 1) Resource monitor de cuenta: 60 créditos, avisos al 50 % y 80 %,
---    suspensión inmediata al 100 %. Solo ACCOUNTADMIN puede crearlo.
+-- 1) Resource monitor de cuenta: 60 créditos, avisos al 50 % y 75 %, suspensión al 90 %
+--    (deja terminar las consultas en curso) e inmediata al 100 %. Solo ACCOUNTADMIN puede crearlo.
 CREATE RESOURCE MONITOR IF NOT EXISTS IDENTIFIER($rm_name)
   WITH CREDIT_QUOTA = 60
   FREQUENCY = MONTHLY
   START_TIMESTAMP = IMMEDIATELY
   TRIGGERS ON 50 PERCENT DO NOTIFY
-           ON 80 PERCENT DO NOTIFY
+           ON 75 PERCENT DO NOTIFY
+           ON 90 PERCENT DO SUSPEND
            ON 100 PERCENT DO SUSPEND_IMMEDIATE;
 
 -- Asignación a nivel cuenta (aplica a warehouses sin monitor propio).

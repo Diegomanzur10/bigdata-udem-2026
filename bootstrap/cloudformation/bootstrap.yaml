@@ -131,6 +131,19 @@ Resources:
             Effect: Allow
             Action: ec2:StopInstances
             Resource: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+          - Sid: AccionDeBudgetsDetenerVm
+            Effect: Allow
+            Action:
+              - ec2:DescribeInstances
+              - ec2:DescribeInstanceStatus
+            Resource: "*"
+          - Sid: AccionDeBudgetsPasarSuRolASsm
+            Effect: Allow
+            Action: iam:PassRole
+            Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/${Prefix}-budgets-action"
+            Condition:
+              StringEquals:
+                "iam:PassedToService": ssm.amazonaws.com
           - Sid: AccionDeBudgetsSoloPoliticaDeBloqueo
             Effect: Allow
             Action:
@@ -383,13 +396,14 @@ Resources:
         RestrictPublicBuckets: true
 
   # ---------------------------------------------------------------------------
-  # Presupuesto mensual con alertas al 50, 80 y 100 % del monto real.
+  # Red de seguridad del total de la cuenta: alerta solo al 100 % del monto real.
+  # Las alertas graduales (40/60/80 %) y el bloqueo los gestiona Terraform (${Prefix}-mensual).
   # ---------------------------------------------------------------------------
   MonthlyBudget:
     Type: AWS::Budgets::Budget
     Properties:
       Budget:
-        BudgetName: !Sub "${Prefix}-monthly"
+        BudgetName: !Sub "${Prefix}-total"
         BudgetType: COST
         TimeUnit: MONTHLY
         BudgetLimit:
@@ -399,22 +413,6 @@ Resources:
         CostTypes:
           IncludeCredit: false
       NotificationsWithSubscribers:
-        - Notification:
-            NotificationType: ACTUAL
-            ComparisonOperator: GREATER_THAN
-            Threshold: 50
-            ThresholdType: PERCENTAGE
-          Subscribers:
-            - SubscriptionType: EMAIL
-              Address: !Ref AlertEmail
-        - Notification:
-            NotificationType: ACTUAL
-            ComparisonOperator: GREATER_THAN
-            Threshold: 80
-            ThresholdType: PERCENTAGE
-          Subscribers:
-            - SubscriptionType: EMAIL
-              Address: !Ref AlertEmail
         - Notification:
             NotificationType: ACTUAL
             ComparisonOperator: GREATER_THAN

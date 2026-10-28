@@ -27,13 +27,19 @@ variable "role_names" {
 variable "alert_thresholds" {
   description = "Umbrales de alerta por email (porcentaje del presupuesto, gasto real)."
   type        = list(number)
-  default     = [50, 80]
+  default     = [40, 80] # el 60 % lo notifica la accion de bloqueo
 }
 
 variable "action_threshold" {
   description = "Umbral (porcentaje, gasto real) que aplica la politica Deny."
   type        = number
   default     = 60
+}
+
+variable "instance_ids" {
+  description = "Instancias EC2 (VM de Airflow) que Budgets detiene por SSM al alcanzar el umbral de bloqueo."
+  type        = list(string)
+  default     = []
 }
 
 variable "permissions_boundary_arn" {
