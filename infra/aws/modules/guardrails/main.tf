@@ -16,6 +16,11 @@ resource "aws_budgets_budget" "mensual" {
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
+  # Sin descontar créditos: con el free plan el gasto neto es ~0 y los topes no actuarían.
+  cost_types {
+    include_credit = false
+  }
+
   dynamic "notification" {
     for_each = var.alert_thresholds
 

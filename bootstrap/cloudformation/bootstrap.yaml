@@ -395,6 +395,9 @@ Resources:
         BudgetLimit:
           Amount: !Ref BudgetUsd
           Unit: USD
+        # Sin descontar créditos del free plan (si no, el gasto neto es ~0 y no alerta).
+        CostTypes:
+          IncludeCredit: false
       NotificationsWithSubscribers:
         - Notification:
             NotificationType: ACTUAL
