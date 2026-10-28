@@ -424,13 +424,13 @@ Resources:
   # ---------------------------------------------------------------------------
   # SageMaker Domain, usuario y Space de Code Editor.
   # ---------------------------------------------------------------------------
-  # Herramientas del curso que la imagen de Code Editor no trae (Java 17, Terraform, snow, zip).
+  # Herramientas del curso que la imagen de Code Editor no trae (Java 17, Terraform, snow, zip, session-manager-plugin).
   # Corre en cada arranque del space; lo que va al home persiste, asi que solo descarga la primera vez.
   CodeEditorToolsLifecycleConfig:
     Type: AWS::SageMaker::StudioLifecycleConfig
     Properties:
       # El contenido de un LCC es inmutable: si cambia el script, sube el sufijo del nombre.
-      StudioLifecycleConfigName: !Sub "${Prefix}-code-editor-tools-v2"
+      StudioLifecycleConfigName: !Sub "${Prefix}-code-editor-tools-v3"
       StudioLifecycleConfigAppType: CodeEditor
       StudioLifecycleConfigContent:
         Fn::Base64: |
@@ -444,6 +444,8 @@ Resources:
           OPT="$HOME_DIR/.local/opt"
           BIN="$HOME_DIR/.local/bin"
           SUDO=""; [[ "$(id -u)" != 0 ]] && SUDO="sudo"
+          # Como root, python3 de la imagen (conda) no esta en el PATH: se usa la ruta absoluta.
+          PY="$(command -v python3 || echo /opt/conda/bin/python3)"
           mkdir -p "$OPT" "$BIN"
           FALLOS=""
 
@@ -463,17 +465,27 @@ Resources:
           if [[ "$("$BIN/terraform" version 2>/dev/null | head -1)" != "Terraform v$TF_VERSION" ]]; then
             { curl -fsSL -o /tmp/tf.zip \
                 "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" \
-              && python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extract('terraform', sys.argv[2])" /tmp/tf.zip "$BIN" \
+              && "$PY" -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extract('terraform', sys.argv[2])" /tmp/tf.zip "$BIN" \
               && chmod +x "$BIN/terraform"; } || FALLOS+=" terraform"
             rm -f /tmp/tf.zip
           fi
 
           if [[ ! -x "$BIN/snow" ]]; then
             if [[ "$(id -un)" == sagemaker-user ]]; then
-              python3 -m pip install --user --quiet snowflake-cli || FALLOS+=" snow"
+              "$PY" -m pip install --user --quiet snowflake-cli || FALLOS+=" snow"
             else
-              sudo -u sagemaker-user -H python3 -m pip install --user --quiet snowflake-cli || FALLOS+=" snow"
+              sudo -u sagemaker-user -H "$PY" -m pip install --user --quiet snowflake-cli || FALLOS+=" snow"
             fi
+          fi
+
+          # session-manager-plugin (tunel SSM a Airflow): se extrae el .deb en el home, sin instalarlo.
+          if [[ ! -x "$BIN/session-manager-plugin" ]]; then
+            { curl -fsSL -o /tmp/ssm.deb \
+                https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb \
+              && dpkg-deb -x /tmp/ssm.deb "$OPT/ssm" \
+              && ln -sfn "$OPT/ssm/usr/local/sessionmanagerplugin/bin/session-manager-plugin" "$BIN/session-manager-plugin"; } \
+              || FALLOS+=" session-manager-plugin"
+            rm -f /tmp/ssm.deb
           fi
 
           PERFIL="$HOME_DIR/.bashrc"
