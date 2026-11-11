@@ -7,10 +7,21 @@ Equipo: <nombres> · Cuenta que reporta (anfitrión): <nombre>
 > Corre esta consulta en la cuenta del anfitrión (ajusta la fecha si mides otro día) y pega el resultado.
 
 ```sql
+-- INFORMATION_SCHEMA pertenece a una base: sin base activa da
+-- «Invalid identifier INFORMATION_SCHEMA.WAREHOUSE_METERING_HISTORY». Por eso va el USE.
+USE DATABASE CURSO;
 SELECT ROUND(SUM(CREDITS_USED), 4) AS CREDITOS
 FROM TABLE(INFORMATION_SCHEMA.WAREHOUSE_METERING_HISTORY(
        DATE_RANGE_START => '2026-11-10'::DATE,
        WAREHOUSE_NAME => 'COMPUTE_WH'));
+```
+
+Alternativa sin base activa (tarda hasta 3 h en reflejar el consumo):
+
+```sql
+SELECT ROUND(SUM(CREDITS_USED), 4) AS CREDITOS
+FROM SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY
+WHERE WAREHOUSE_NAME = 'COMPUTE_WH' AND START_TIME >= '2026-11-10'::DATE;
 ```
 
 | Día medido | Warehouse | Tamaño | Créditos |

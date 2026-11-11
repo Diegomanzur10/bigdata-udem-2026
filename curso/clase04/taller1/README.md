@@ -178,10 +178,21 @@ Todo en la carpeta `taller1/` de la rama principal del fork del anfitrión.
 **Cómo medir los créditos y capturar el Query Profile.**
 
 ```sql
+-- INFORMATION_SCHEMA pertenece a una base: sin base activa da
+-- «Invalid identifier INFORMATION_SCHEMA.WAREHOUSE_METERING_HISTORY». Por eso va el USE.
+USE DATABASE CURSO;
 SELECT ROUND(SUM(CREDITS_USED), 4) AS CREDITOS
 FROM TABLE(INFORMATION_SCHEMA.WAREHOUSE_METERING_HISTORY(
        DATE_RANGE_START => '2026-11-10'::DATE,
        WAREHOUSE_NAME => 'COMPUTE_WH'));
+```
+
+Alternativa sin base activa (tarda hasta 3 h en reflejar el consumo):
+
+```sql
+SELECT ROUND(SUM(CREDITS_USED), 4) AS CREDITOS
+FROM SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY
+WHERE WAREHOUSE_NAME = 'COMPUTE_WH' AND START_TIME >= '2026-11-10'::DATE;
 ```
 
 La fecha es el día de la clase; ajústala si mides otro día. Para el Query Profile (el desglose por operador de una consulta): Snowsight > **Monitoring > Query History** > abre tu consulta más pesada > pestaña **Query Profile** > captura de pantalla > guárdala como `query_profile.png`. Comenta en `costos.md` qué operador concentra el tiempo y qué harías. Referencia de presupuesto (estimación del pensum, no medida): hasta 0.3 créditos el Lab 4 y hasta 0.8 el taller en clase.
