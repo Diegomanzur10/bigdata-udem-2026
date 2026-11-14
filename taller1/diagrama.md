@@ -4,10 +4,6 @@ Equipo: Valentina Restrepo Arboleda y Andres Fernando Molina Orozco.
 
 Grano: Una fila por fecha de recogida, zona de origen y empresa de plataforma.
 
-Reemplaza el diagrama de abajo por el de tu estrella: una tabla de hechos al centro y al menos dos
-dimensiones, cada una con su clave. GitHub dibuja el bloque `mermaid` al abrir este archivo. Si
-prefieres una imagen, súbela como `diagrama.png` a esta carpeta y deja aquí un enlace a ella.
-
 ```mermaid
 erDiagram
     DIM_FECHA   ||--o{ FACT_VIAJES_DIA : "FECHA"
