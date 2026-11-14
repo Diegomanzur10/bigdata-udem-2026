@@ -14,7 +14,6 @@ El costo total del equipo fue de **6 USD**, distribuidos así:
 | Xiomi        | 0           |
 | **Total**    | **6**       |
 
-Miguel Ángel tuvo cobros adicionales al terminar el taller, por lo que su monto subió respecto a la estimación inicial.
 
 ## Créditos usados
 
