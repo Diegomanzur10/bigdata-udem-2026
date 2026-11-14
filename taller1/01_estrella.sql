@@ -1,7 +1,7 @@
--- GRANO: <escribe aquí, en una frase, qué representa una fila de FACT_VIAJES_DIA. Sugerido: «una fila por fecha, zona y empresa»>
+-- GRANO: una fila por fecha, zona y empresa
 -- =====================================================================
 -- TALLER 1 · 01_estrella.sql · DDL de la estrella (esqueleto)
--- Equipo: <Nombres> · Anfitrión: <nombre> · Caso elegido: <A, B o C>
+-- Equipo: <VALENTINA RESTREPO ARBOLEDA, ANDRES FERNANDO MOLINA OROZCO> · Anfitrión: <VALENTINA RESTREPO ARBOLEDA (GIT:ValentinaRestrepo2)> · Caso elegido: <A>
 -- =====================================================================
 -- CÓMO USAR ESTE ARCHIVO
 --   1. Copia esta carpeta (plantilla/) a taller1/ en el fork del anfitrión: Add file > Create new
