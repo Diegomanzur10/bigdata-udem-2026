@@ -30,7 +30,7 @@ SELECT DISTINCT
     SERVICE_ZONE
 FROM CURSO.LAB4.DIM_ZONA 
 WHERE ZONA 
-NOT LIKE 'N/A'
+NOT LIKE 'N/A';
 
 -- TODO · Carga de DIM_FECHA (los días entre el primero y el último del gold; la lluvia del día una sola vez).
 INSERT INTO DIM_FECHA
