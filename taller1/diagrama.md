@@ -4,8 +4,6 @@ Equipo: Valentina Restrepo Arboleda y Andres Fernando Molina Orozco.
 
 Grano: Una fila por fecha, zona y empresa.
 
-> **Nota:** Ver la imagen completa del modelo relacional en la carpeta como `diagrama.png` (o visualizarla directamente a través del enlace de la imagen generada). Allí se aprecia mejor la estructura y las relaciones del modelo estrella.
-
 ![Modelo Relacional en Estrella](diagrama.png)
 
 ```mermaid
