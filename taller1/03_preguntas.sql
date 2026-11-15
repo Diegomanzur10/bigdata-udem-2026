@@ -34,21 +34,23 @@ SELECT
     EMPRESA, 
     ROUND(SUM(PROPINA_PROMEDIO * VIAJES) / SUM(VIAJES), 2) AS PROPINA_PROMEDIO_PONDERADA
 FROM FACT_VIAJES_DIA
-GROUP BY EMPRESA;
+GROUP BY EMPRESA
+ORDER BY EMPRESA;
 -- Interpretación: Los datos reflejan que Lyft (1.18) obtiene una propina promedio ponderada ligeramente superior a la de Uber (1.06) por viaje en el trimestre; no obstante, esta cifra solo muestra una diferencia en el comportamiento de agradecimiento de los usuarios entre ambas plataformas, pero no explica si se debe a diferencias en las tarifas base, la duración de los recorridos o la satisfacción con el servicio.
 
 -- ---------------------------------------------------------------------
 -- Pregunta 3: Las tres zonas con más viajes de cada empresa
 -- ---------------------------------------------------------------------
 -- TODO · consulta
-SELECT 
-    EMPRESA, 
-    ZONA, 
+SELECT
+    EMPRESA,
+    ZONA,
     SUM(VIAJES) AS TOTAL_VIAJES,
     RANK() OVER (PARTITION BY EMPRESA ORDER BY SUM(VIAJES) DESC) AS RANKING
 FROM FACT_VIAJES_DIA
 GROUP BY EMPRESA, ZONA
-QUALIFY RANKING <= 3;
+QUALIFY RANK() OVER (PARTITION BY EMPRESA ORDER BY SUM(VIAJES) DESC) <= 3
+ORDER BY EMPRESA, RANKING;
 -- Interpretación: Se evidencia una convergencia estratégica entre Uber y Lyft, ya que ambas plataformas comparten exactamente las mismas tres zonas de mayor demanda en todo el primer trimestre de 2024: LaGuardia Airport, JFK Airport y el sector residencial y comercial de East Village; sin embargo, mientras que para Lyft el primer lugar lo lidera LaGuardia con cerca de 295 mil viajes, para Uber el nodo con mayor flujo es el aeropuerto JFK con una cifra masiva que supera los 810 mil viajes, lo que demuestra que si bien compiten en los mismos epicentros de transporte y movilidad de la ciudad, Uber opera a una escala de volumen significativamente mayor en los nodos aeroportuarios.
 
 -- ---------------------------------------------------------------------
