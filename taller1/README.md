@@ -9,7 +9,7 @@
 
 *   **Valentina Restrepo Arboleda**
 *   **Andres Fernando Molina Orozco**
-*   
+  
 | Rol | Responsable |
 |---|---|
 | Analista | Valentina Restrepo Arboleda |
