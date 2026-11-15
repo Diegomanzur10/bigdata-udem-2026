@@ -2,7 +2,11 @@
 
 Equipo: Valentina Restrepo Arboleda y Andres Fernando Molina Orozco.
 
-Grano: Una fila por fecha de recogida, zona de origen y empresa de plataforma.
+Grano: Una fila por fecha, zona y empresa.
+
+> **Nota:** Ver la imagen completa del modelo relacional en la carpeta como `diagrama.png` (o visualizarla directamente a través del enlace de la imagen generada). Allí se aprecia mejor la estructura y las relaciones del modelo estrella.
+
+![Modelo Relacional en Estrella](diagrama.png)
 
 ```mermaid
 erDiagram
@@ -16,14 +20,16 @@ erDiagram
         varchar EMPRESA
         number  VIAJES
         float   INGRESO_TOTAL
-        float   PROPINA_TOTAL
-        float   DISTANCIA_TOTAL
+        float   PROPINA_PROMEDIO
+        float   DISTANCIA_PROMEDIO
     }
     DIM_FECHA {
         date    FECHA PK
         number  ANIO
         number  MES
-        number  DIA_SEMANA
+        varchar DIA_SEMANA
+        boolean ES_FIN_SEMANA
+        boolean ES_FESTIVO
         float   LLUVIA_MM
     }
     DIM_ZONA {
@@ -35,6 +41,7 @@ erDiagram
         varchar EMPRESA PK
     }
 ```
+
 
 ## Claves
 
