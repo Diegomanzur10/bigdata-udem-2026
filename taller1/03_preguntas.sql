@@ -1,7 +1,7 @@
 -- =====================================================================
 -- TALLER 1 · 03_preguntas.sql · Las cinco preguntas del caso (esqueleto)
 -- =====================================================================
--- Caso elegido: <A · Competencia entre plataformas | B · Clima y festivos | C · Aeropuertos y distritos>
+-- Caso elegido: <A · Competencia entre plataformas>
 -- Entre las cinco preguntas usa al menos: RANK con QUALIFY, LAG y una agregación de ventana
 -- (SUM o AVG con OVER). Cada pregunta lleva su enunciado arriba, su consulta y, debajo, un
 -- comentario que interprete el resultado (qué dice el número y qué no dice).
