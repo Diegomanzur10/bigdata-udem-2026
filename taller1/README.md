@@ -3,7 +3,6 @@
 **Módulo de Big Data e Ingeniería de Datos (Universidad de Medellín)**  
 **Equipo de Analítica:** Autoridad de Movilidad de NYC  
 
----
 
 ## 1. Integrantes y Roles del Equipo
 
@@ -17,7 +16,6 @@
 | Ingeniero de datos | Valentina Restrepo Arboleda |
 | Calidad y costos | Andres Fernando Molina Orozco |
 
----
 
 ## 2. Contexto y Objetivos del Taller
 
@@ -29,14 +27,12 @@ Para cumplir con este propósito técnico y de negocio, el trabajo se estructur�
 3.  **Resolución analítica de preguntas (Caso A):** Implementación de funciones de ventana analítica (`RANK`, `QUALIFY`, `LAG`, agregaciones particionadas) enfocadas en la competencia entre plataformas.
 4.  **Comunicación ejecutiva:** Redacción de un memo estratégico para una audiencia no técnica y reporte detallado de costos computacionales.
 
----
 
 ## 3. Elección del Caso: Caso A · Competencia entre plataformas
 
 El equipo seleccionó el **Caso A**, centrado en la pregunta guía: *¿Hay concentración en el mercado de viajes por zona y cómo evoluciona?*
 *   **Alcance analítico:** Estudio del comportamiento de Uber frente a Lyft en términos de volumen de viajes, ingresos, propinas ponderadas, concentración de mercado por zona y variaciones mensuales de participación mediante funciones de ventana.
 
----
 
 ## 4. El Modelo Estrella y su Grano
 
@@ -47,7 +43,6 @@ El equipo seleccionó el **Caso A**, centrado en la pregunta guía: *¿Hay conce
     *   `DIM_ZONA`: Dimensión geográfica depurada que unifica distritos (`BOROUGH`) y zonas de servicio (`SERVICE_ZONE`) resolviendo duplicidades de nombres.
     *   `DIM_EMPRESA`: Dimensión categórica construida mediante `SELECT DISTINCT` para las plataformas operativas.
 
----
 
 ## 5. Resumen de Entregables Ubicados en el Repositorio (`taller1/`)
 
@@ -60,4 +55,3 @@ El equipo seleccionó el **Caso A**, centrado en la pregunta guía: *¿Hay conce
 *   `costos.md`: Reporte de créditos de Snowflake consumidos y análisis del operador más costoso en el *Query Profile*.
 *   `RETOS.md`: Registro de los retos opcionales implementados.
 *   `autoverificacion.txt`: Salida oficial obtenida al ejecutar el script de verificación.
-```
