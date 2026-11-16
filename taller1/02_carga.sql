@@ -16,6 +16,11 @@ USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE COMPUTE_WH;
 USE SCHEMA CURSO.T1;
 
+--Codigo preventivo de borrado de datos en caso de que ya esten completa la informacion de las tablas a cargar
+TRUNCATE TABLE FACT_VIAJES_DIA;
+TRUNCATE TABLE DIM_EMPRESA;
+TRUNCATE TABLE DIM_ZONA;
+TRUNCATE TABLE DIM_FECHA;
 
 -- TODO · Carga de DIM_EMPRESA.
 INSERT INTO DIM_EMPRESA
