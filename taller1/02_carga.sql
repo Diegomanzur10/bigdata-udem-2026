@@ -16,28 +16,26 @@ USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE COMPUTE_WH;
 USE SCHEMA CURSO.T1;
 
---Codigo preventivo de borrado de datos en caso de que ya esten completa la informacion de las tablas a cargar
+-- Código preventivo de borrado de datos en caso de que ya este completa la informacion de las tablas a cargar.
 TRUNCATE TABLE FACT_VIAJES_DIA;
 TRUNCATE TABLE DIM_EMPRESA;
 TRUNCATE TABLE DIM_ZONA;
 TRUNCATE TABLE DIM_FECHA;
 
--- TODO · Carga de DIM_EMPRESA.
+-- Carga de DIM_EMPRESA.
 INSERT INTO DIM_EMPRESA
 SELECT DISTINCT EMPRESA 
 FROM CURSO.LAB4.DAILY_ZONE_METRICS;
 
--- TODO · Carga de DIM_ZONA (una fila por nombre de zona).
+-- Carga de DIM_ZONA (una fila por nombre de zona).
 INSERT INTO DIM_ZONA
 SELECT DISTINCT 
     ZONA,
     BOROUGH,
     SERVICE_ZONE
-FROM CURSO.LAB4.DIM_ZONA 
-WHERE ZONA 
-NOT LIKE 'N/A';
+FROM CURSO.LAB4.DIM_ZONA;
 
--- TODO · Carga de DIM_FECHA (los días entre el primero y el último del gold; la lluvia del día una sola vez).
+-- Carga de DIM_FECHA (los días entre el primero y el último del gold; la lluvia del día una sola vez).
 INSERT INTO DIM_FECHA
 WITH r AS (SELECT MIN(FECHA) AS MINF, MAX(FECHA) AS MAXF FROM CURSO.LAB4.DAILY_ZONE_METRICS),
 dias AS (
@@ -61,7 +59,7 @@ LEFT JOIN (
     GROUP BY FECHA
 ) m ON d.FECHA = m.FECHA;
   
--- TODO · Carga de FACT_VIAJES_DIA.
+-- Carga de FACT_VIAJES_DIA.
 INSERT INTO FACT_VIAJES_DIA
 SELECT 
     FECHA,
@@ -69,10 +67,17 @@ SELECT
     EMPRESA,
     VIAJES,
     INGRESO_TOTAL,
-    PROPINA_PROMEDIO,
-    DISTANCIA_PROMEDIO
+    PROPINA_PROMEDIO * VIAJES    AS PROPINA_TOTAL,
+    DISTANCIA_PROMEDIO * VIAJES  AS DISTANCIA_TOTAL
 FROM CURSO.LAB4.DAILY_ZONE_METRICS;
 
 -- Conteo de control contra el paquete: 46715 filas y 60268466 viajes.
-SELECT COUNT(*) AS FILAS, SUM(VIAJES) AS VIAJES FROM CURSO.T1.FACT_VIAJES_DIA;
+SELECT COUNT(*) AS FILAS, SUM(VIAJES) AS VIAJES FROM CURSO.T1.FACT_VIAJES_DIA
+
+-- Conteo de validación de filas antes y después de unir.
+-- SELECT COUNT(*) AS FILAS_ANTES FROM CURSO.LAB4.DAILY_ZONE_METRICS
+-- UNION ALL
+-- SELECT COUNT(*) AS FILAS_DESPUES
+-- FROM CURSO.LAB4.DAILY_ZONE_METRICS G
+-- LEFT JOIN CURSO.T1.DIM_ZONA Z ON G.ZONA = Z.ZONA;
 
