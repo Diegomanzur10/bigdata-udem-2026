@@ -19,7 +19,7 @@ Tabla comparativa con resultados para el reto R6 Snowflake vs Athenea
 
 | Mes | Filas Athena | Filas Snowflake | Viajes Athena | Viajes Snowflake | ¿Coinciden? |
 |---|---|---|---|---|---|
-| ENERO | 15.909 | 15.909 | 19.650 | 19.650 | SI |
+| ENERO | 15.909 | 15.909 | 19.650.023 | 19.650.023 | SI |
 | FEBRERO | 14.889 | 14.889 | 19.344.724 | 19.344.724 | SI |
 | MARZO | 15.917 | 15.917 | 21.273.719 | 21.273.719 | SI |
 | TOTAL | 46.715 | 46.715 | 60.268.466 | 60.268.466 | SI |
