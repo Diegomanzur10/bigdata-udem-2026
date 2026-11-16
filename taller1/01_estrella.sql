@@ -1,7 +1,8 @@
 -- GRANO: una fila por fecha, zona y empresa
 -- =====================================================================
 -- TALLER 1 · 01_estrella.sql · DDL de la estrella (esqueleto)
--- Equipo: <VALENTINA RESTREPO ARBOLEDA, ANDRES FERNANDO MOLINA OROZCO> · Anfitrión: <VALENTINA RESTREPO ARBOLEDA (GIT:ValentinaRestrepo2)> · Caso elegido: <A>
+-- Equipo: Valentina Restrepo Arboleda y Andres Fernando Molina Orozco · Anfitrión: Valentina Restrepo Arboleda  (GIT:ValentinaRestrepo2) ·
+--- Caso elegido: Caso A · Competencia entre plataformas
 -- =====================================================================
 -- CÓMO USAR ESTE ARCHIVO
 --   1. Copia esta carpeta (plantilla/) a taller1/ en el fork del anfitrión: Add file > Create new
@@ -24,18 +25,18 @@ USE WAREHOUSE COMPUTE_WH;
 CREATE SCHEMA IF NOT EXISTS CURSO.T1;
 USE SCHEMA CURSO.T1;
 
--- TODO · DIM_EMPRESA: clave y nombre de la empresa.
+-- DIM_EMPRESA: clave y nombre de la empresa.
 CREATE OR REPLACE TABLE DIM_EMPRESA (
     EMPRESA VARCHAR(10) PRIMARY KEY);
 
--- TODO · DIM_ZONA: clave única, zona, distrito (BOROUGH) y tipo de zona (SERVICE_ZONE).
+-- DIM_ZONA: clave única, zona, distrito (BOROUGH) y tipo de zona (SERVICE_ZONE).
 CREATE OR REPLACE TABLE DIM_ZONA (    
-    ZONA VARCHAR(100) PRIMARY KEY NOT NULL,
-    BOROUGH VARCHAR(100),
-    SERVICE_ZONE VARCHAR(100)
+    ZONA VARCHAR(100) PRIMARY KEY,
+    BOROUGH VARCHAR(100) NOT NULL,
+    SERVICE_ZONE VARCHAR(100) NOT NULL
 );
 
--- TODO · DIM_FECHA: un día por fila, con día de la semana, fin de semana, festivo y la lluvia del día.
+-- DIM_FECHA: un día por fila, con día de la semana, fin de semana, festivo y la lluvia del día.
 CREATE OR REPLACE TABLE DIM_FECHA (
     FECHA DATE PRIMARY KEY,
     ANIO NUMBER(4) NOT NULL,
@@ -46,25 +47,23 @@ CREATE OR REPLACE TABLE DIM_FECHA (
     LLUVIA_MM FLOAT NOT NULL
 );
 
--- TODO · FACT_VIAJES_DIA: las llaves de las dimensiones y las medidas aditivas.
-CREATE OR REPLACE TABLE FACT_VIAJES_DIA ( FECHA DATE,
-    ZONA VARCHAR(100),
-    EMPRESA VARCHAR(10),
-    VIAJES NUMBER,
+-- FACT_VIAJES_DIA: las llaves de las dimensiones y las medidas aditivas.
+CREATE OR REPLACE TABLE FACT_VIAJES_DIA (
+    FECHA DATE NOT NULL,
+    ZONA VARCHAR(100) NOT NULL,
+    EMPRESA VARCHAR(10) NOT NULL,
+    VIAJES NUMBER NOT NULL,
     INGRESO_TOTAL FLOAT,
-    PROPINA_PROMEDIO FLOAT,
-    DISTANCIA_PROMEDIO FLOAT,
-    
-    FOREIGN KEY (FECHA)
-        REFERENCES DIM_FECHA(FECHA),
-
-    FOREIGN KEY (ZONA)
-        REFERENCES DIM_ZONA(ZONA),
-
-    FOREIGN KEY (EMPRESA)
-        REFERENCES DIM_EMPRESA(EMPRESA) );
+    PROPINA_TOTAL FLOAT,   -- PROPINA_PROMEDIO * VIAJES (aditiva)
+    DISTANCIA_TOTAL FLOAT,   -- DISTANCIA_PROMEDIO * VIAJES (aditiva)
+    PRIMARY KEY (FECHA, ZONA, EMPRESA),
+    FOREIGN KEY (FECHA) REFERENCES DIM_FECHA(FECHA),
+    FOREIGN KEY (ZONA) REFERENCES DIM_ZONA(ZONA),
+    FOREIGN KEY (EMPRESA) REFERENCES DIM_EMPRESA(EMPRESA)
+);
 
 -- Claves (una línea por dimensión): cómo se une cada dimensión con el hecho y por qué esa clave es única.
 --   DIM_EMPRESA: Se une por la columna de la tabla de hecho EMPRESA. Es una clave única debido a que solo se tienen dos registros únicos (Aplicaciones)
---   DIM_ZONA: Se une por la columna de la tabla de hecho ZONA. Es una clave única debido a que para BOROUGH y SERVICE_ZONE existe zonas unicas. (El problema de la tabla con zonas duplicadas se trata en la carga.sql)
+--   DIM_ZONA: Se une por la columna de la tabla de hecho ZONA. Es una clave única debido a que para BOROUGH y SERVICE_ZONE existe zonas unicas.
+--   (El problema de la tabla con zonas duplicadas se trata en la carga.sql)
 --   DIM_FECHA: Se une por la columna de la tabla de hecho Date. Es una clave única debido a que la tabla DIM_FECHA solo se tiene un registro por día.
