@@ -66,4 +66,4 @@ CREATE OR REPLACE TABLE FACT_VIAJES_DIA (
 --   DIM_EMPRESA: Se une por la columna de la tabla de hecho EMPRESA. Es una clave única debido a que solo se tienen dos registros únicos (Aplicaciones)
 --   DIM_ZONA: Se une por la columna de la tabla de hecho ZONA. Es una clave única debido a que para BOROUGH y SERVICE_ZONE existe zonas unicas.
 --   (El problema de la tabla con zonas duplicadas se trata en la carga.sql)
---   DIM_FECHA: Se une por la columna de la tabla de hecho Date. Es una clave única debido a que la tabla DIM_FECHA solo se tiene un registro por día.
+--   DIM_FECHA: Se une por la columna de la tabla de hecho FECHA. Es una clave única debido a que la tabla DIM_FECHA solo se tiene un registro por día.
