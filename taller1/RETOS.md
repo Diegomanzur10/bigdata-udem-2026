@@ -13,6 +13,7 @@ Marca los que hicieron y di dónde está cada uno.
 | R6 | Tabla externa de Athena sobre el paquete (la del Lab 4, E7) y reconciliación de conteos con Snowflake: filas por mes y viajes totales, con captura de `Data scanned` | 3 | sí | Tabla evidencia en el presente archivo, en [`Imagen athenea`](AtheneaDataScaned.png) |
 
 Para R6, si lo hacen: pega aquí la reconciliación (filas por mes y viajes totales en Athena y en Snowflake) y guarda la captura de `Data scanned` en esta carpeta.
+Se muestra resultado de Athena ![Athena](AtheneaDataScaned.png)
 
 Tabla comparativa con resultados para el reto R6 Snowflake vs Athenea
 
