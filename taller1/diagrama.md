@@ -4,8 +4,6 @@ Equipo: Valentina Restrepo Arboleda y Andres Fernando Molina Orozco.
 
 Grano: una fila por fecha, zona de recogida y empresa. Cada fila resume los viajes de una empresa en una zona durante un día.
 
-![Modelo Relacional en Estrella](diagrama.png)
-
 ```mermaid
 erDiagram
     DIM_FECHA   ||--o{ FACT_VIAJES_DIA : "FECHA"
