@@ -88,72 +88,27 @@ ORDER BY CUOTA_MERCADO DESC, F.MES ASC, H.ZONA ASC, H.EMPRESA ASC;
 -- ---------------------------------------------------------------------
 
 WITH CUOTA_MENSUAL AS (
-
-    SELECT
-        F.ANIO,
-        F.MES,
-        H.ZONA,
-        H.EMPRESA,
-
-        SUM(H.VIAJES) AS VIAJES_EMPRESA,
-
-        SUM(H.VIAJES)
-        / NULLIF(
-            SUM(SUM(H.VIAJES)) OVER (
-                PARTITION BY F.ANIO, F.MES, H.ZONA
-            ),
-            0
-        ) AS CUOTA_MERCADO
-
+    SELECT F.ANIO, F.MES, H.ZONA, H.EMPRESA,
+           SUM(H.VIAJES) / NULLIF(SUM(SUM(H.VIAJES)) OVER (PARTITION BY F.ANIO, F.MES, H.ZONA), 0) AS CUOTA
     FROM FACT_VIAJES_DIA H
-    LEFT JOIN DIM_FECHA F
-        ON H.FECHA = F.FECHA
-
-    GROUP BY
-        F.ANIO,
-        F.MES,
-        H.ZONA,
-        H.EMPRESA
+    JOIN DIM_FECHA F ON H.FECHA = F.FECHA
+    GROUP BY F.ANIO, F.MES, H.ZONA, H.EMPRESA
+),
+CUOTA_ANT_ACT AS (
+    SELECT ANIO, MES, ZONA, EMPRESA, CUOTA,
+           LAG(CUOTA) OVER (PARTITION BY EMPRESA, ZONA ORDER BY ANIO, MES) AS CUOTA_ANTERIOR,
+           LAG(MES)   OVER (PARTITION BY EMPRESA, ZONA ORDER BY ANIO, MES) AS MES_ANTERIOR
+    FROM CUOTA_MENSUAL
 )
-
-SELECT
-    ANIO,
-    MES,
-    ZONA,
-    EMPRESA,
-
-    ROUND(100*CUOTA_MERCADO,2) AS CUOTA_MERCADO,
-
-    ROUND( LAG(CUOTA_MERCADO) OVER (
-            PARTITION BY EMPRESA, ZONA
-            ORDER BY ANIO, MES
-        ) * 100, 2) AS CUOTA_MES_ANTERIOR,
-
-    ROUND( 100*(CUOTA_MERCADO- LAG(CUOTA_MERCADO)
-        OVER (  PARTITION BY EMPRESA, ZONA
-                ORDER BY ANIO, MES)),4) AS VARIACION_CUOTA
-FROM CUOTA_MENSUAL
-
-QUALIFY
-    LAG(CUOTA_MERCADO) OVER (
-        PARTITION BY EMPRESA, ZONA
-        ORDER BY ANIO, MES
-    ) IS NOT NULL
-    AND
-    LAG(CUOTA_MERCADO) OVER (
-        PARTITION BY EMPRESA, ZONA
-        ORDER BY ANIO, MES
-    ) < 0.70
-    AND
-    CUOTA_MERCADO >= 0.70
-    --CONDICION PARA EVITAR CASOS EN LOS QUE NO SE HAYA TENIDO VIAJES EN LA ZONA EN EL MES ANTERIOR
-    AND MES- LAG(MES) OVER (partition by EMPRESA,ZONA ORDER BY ANIO, MES) = 1
-
-ORDER BY
-    ANIO,
-    MES,
-    ZONA,
-    EMPRESA;
+SELECT ANIO, MES, ZONA, EMPRESA,
+       ROUND(100 * CUOTA, 2)                    AS CUOTA_PCT,
+       ROUND(100 * CUOTA_ANTERIOR, 2)           AS CUOTA_MES_ANTERIOR_PCT,
+       ROUND(100 * (CUOTA - CUOTA_ANTERIOR), 2) AS VARIACION_PUNTOS,
+       IFF(MES - MES_ANTERIOR = 1 AND CUOTA_ANTERIOR < 0.70 AND CUOTA >= 0.70,
+           'SI', 'NO')                          AS CRUZA_70
+FROM CUOTA_ANT_ACT
+WHERE CUOTA_ANTERIOR IS NOT NULL
+ORDER BY CRUZA_70 DESC, ANIO, MES, ZONA, EMPRESA;
 
 -- Observacion: Enero al ser el primer mes no contiene datos para obtener una variacion. Por lo que este mes se excluye en el resultado final.
 --Interpretacion: Un hallazgo relevante es que todos los casos corresponden a Uber, lo que indica UBER gana mayor participación del mercado 
