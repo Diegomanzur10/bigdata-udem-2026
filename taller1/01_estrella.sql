@@ -62,7 +62,7 @@ CREATE OR REPLACE TABLE FACT_VIAJES_DIA ( FECHA DATE,
         REFERENCES DIM_ZONA(ZONA),
 
     FOREIGN KEY (EMPRESA)
-        REFERENCES DIM_EMPRESA(EMPRESA) )
+        REFERENCES DIM_EMPRESA(EMPRESA) );
 
 -- Claves (una línea por dimensión): cómo se une cada dimensión con el hecho y por qué esa clave es única.
 --   DIM_EMPRESA: Se une por la columna de la tabla de hecho EMPRESA. Es una clave única debido a que solo se tienen dos registros únicos (Aplicaciones)
