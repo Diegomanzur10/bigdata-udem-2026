@@ -4,19 +4,22 @@
 -- =====================================================================
 
 -- RETO R2: DIM_FECHA con festivos y fin de semana, usada en una consulta
-SELECT
-    D.ES_FIN_SEMANA,
-    D.ES_FESTIVO,
-    COUNT(*)                        AS DIAS,
-    ROUND(AVG(TV.TOTAL_VIAJES), 0)  AS PROMEDIO_VIAJES_DIA
-FROM (
-    SELECT FECHA, SUM(VIAJES) AS TOTAL_VIAJES
-    FROM FACT_VIAJES_DIA
-    GROUP BY FECHA
-) TV
-JOIN DIM_FECHA D ON D.FECHA = TV.FECHA
-GROUP BY D.ES_FIN_SEMANA, D.ES_FESTIVO
-ORDER BY D.ES_FIN_SEMANA, D.ES_FESTIVO;
+
+--Pregunta a resolver ¿Qué empresa usará más los habitantes de NYC durante los fines de semanas y días festivos?
+SELECT    
+    FVD.EMPRESA,    
+    SUM(FVD.VIAJES) AS CantidadViajes,
+    SUM(FVD.INGRESO_TOTAL) AS IngresosTotales
+FROM DIM_FECHA DF 
+RIGHT JOIN FACT_VIAJES_DIA FVD ON FVD.FECHA = DF.FECHA
+where DF.es_fin_semana = TRUE OR DF.es_festivo = true
+group by FVD.EMPRESA
+ORDER BY CantidadViajes DESC, IngresosTotales DESC;
+
+--Respuesta: Los habitantes de NYC en el periodo del primer trimestre del 2024, los fines de semanas y festivos prefieren usar más la plataforma UBER con un total de 15.206.603
+--viajes registrados otorgando un ingreso de 453.115.708,34 USD. Lyft presenta 5.508.694 viajes con ingresos totales de 163.319.086,02 USD.
+--Lo que indica que los fines de semanas UBER realiza cerca de 2.8 veces más viajes que Lyft y gana en proporcion aproximadamente 2.8 veces más dinero que Lyft. 
+--Esta respuesta es importante para UBER para prepararse operativamente frente a la gran demanda de transporte que se tiene los fines de semana y días festivos.
 
 -- RETO R3: Lluvia fuerte (> 10 mm) frente a la línea base del mismo día
 WITH DemandaDiaria AS (
