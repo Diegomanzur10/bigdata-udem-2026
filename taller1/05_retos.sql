@@ -71,3 +71,13 @@ SELECT
 FROM Islas
 GROUP BY ZONA, GRUPO_ISLA
 ORDER BY DIAS_CONSECUTIVOS DESC, ZONA, INICIO_RACHA;
+
+-- RETO R6: Tabla externa de Athena sobre el paquete (la del Lab 4, E7) y reconciliación de conteos con Snowflake: 
+--filas por mes y viajes totales, con captura de Data scanned
+
+--Query para conocer cantidad de filas por mes y viajes totales por mes
+SELECT D.MES, COUNT(*) AS FILAS, SUM(F.VIAJES) AS VIAJES
+FROM CURSO.T1.FACT_VIAJES_DIA F
+JOIN CURSO.T1.DIM_FECHA D ON F.FECHA = D.FECHA
+GROUP BY D.MES
+ORDER BY D.MES;
