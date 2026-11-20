@@ -7,6 +7,9 @@ USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE COMPUTE_WH;
 USE SCHEMA CURSO.T1;
 
+-- RETO R1: Un segundo caso completo (cinco preguntas más) --> Caso seleccionado B
+
+
 -- RETO R2: DIM_FECHA con festivos y fin de semana, usada en una consulta
 --Pregunta a resolver ¿Qué empresa usará más los habitantes de NYC durante los fines de semanas y días festivos?
 SELECT    
