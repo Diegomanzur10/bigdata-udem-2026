@@ -4,48 +4,44 @@ Equipo: Valentina Restrepo Arboleda y Andres Fernando Molina Orozco · Cuenta qu
 
 ## Créditos usados
 
-Medición en la cuenta del anfitrión, con rol ACCOUNTADMIN y warehouse COMPUTE_WH (X-Small).
+> Medición en la cuenta del anfitrión, con rol `ACCOUNTADMIN` y warehouse `COMPUTE_WH`. Las mediciones cubren los tres días en que se trabajó en el taller.
+
+**Rol:** `ACCOUNTADMIN`.
+
+**Cómo se obtuvieron los valores.** La consulta devuelve consumo acumulado desde una fecha hasta el momento de ejecución, así que cada tramo debe calcularse por diferencia:
+
+- Desde el 14 de noviembre: 1.8501.
+- Desde el 15 de noviembre: 0.9513. Por diferencia, el 14 consumió 1.8501 − 0.9513 = 0.8988.
+- Desde el 19 de noviembre: 0.3090. Por diferencia, el 15 consumió 0.9513 − 0.3090 = 0.6423.
 
 | Día medido | Warehouse | Tamaño | Créditos |
 |---|---|---|---|
 | 2026-11-14 | COMPUTE_WH | XS | 0.8988 |
-| 2026-11-15 | COMPUTE_WH | XS | 0.5331 |
-| **Total** | | | **1.4319** |
+| 2026-11-15 | COMPUTE_WH | XS | 0.6423 |
+| 2026-11-19 | COMPUTE_WH | XS | 0.3090 |
+| **Total** | | | **1.8501** |
 
-El consumo del 14 se obtuvo restando el del 15 al total desde el 14 (1.4319 − 0.5331). La consulta por día confirma ambos valores:
+**Referencia de presupuesto (estimación del pensum, no medida):** hasta 0.3 créditos para el Lab 4 y hasta 0.8 para el taller en clase. El consumo medido de 1.8501 supera la referencia créditos. Podemos identificar dos posibles causas del aumento:
 
-```sql
-SELECT START_TIME::DATE AS DIA,
-       WAREHOUSE_NAME,
-       ROUND(SUM(CREDITS_USED), 4) AS CREDITOS
-FROM TABLE(SNOWFLAKE.INFORMATION_SCHEMA.WAREHOUSE_METERING_HISTORY(
-       DATE_RANGE_START => '2026-11-14'::DATE,
-       DATE_RANGE_END   => '2026-11-15'::DATE,
-       WAREHOUSE_NAME   => 'COMPUTE_WH'))
-GROUP BY 1, 2
-ORDER BY 1;
-```
-
-Referencia de presupuesto (estimación del pensum, no medida): hasta 0.3 créditos el Lab 4 y hasta 0.8 el taller en clase. El consumo medido (1.4319) supera la referencia propuesta en el taller. Esto se debe a que se realizaron varias consultas y ejecuciones repetidas de los chequeos (`SELECT 'filas' ...`) y de la carga (`INSERT INTO FACT_VIAJES_DIA`, `CREATE OR REPLACE TABLE DIM_EMPRESA`) durante el desarrollo.
+- **Iteraciones fuera de clase.** La carga completa de los datos del LAB 4 (`INSERT INTO FACT_VIAJES_DIA`, `CREATE OR REPLACE TABLE DIM_EMPRESA`) y los chequeos (`SELECT 'filas' ...`) fueron ejecutados varias veces los días 14 y 15. 
+- **Vistas recalculadas.** La consulta más pesada recalcula zona × día en cada ejecución.
 
 ## Consulta más pesada
 
-- Consulta: la generación de días de `DIM_FECHA` (`WITH r AS ... dias AS ...`), que alimenta el `INSERT INTO DIM_FECHA` de `02_carga.sql`. Pertenece a la carga de la estrella, no a las preguntas resueltas del caso A.
-- ID de la consulta: `01c86a80-0109-d9e2-0012-c5fa0009a3a2`.
-- Cómo la encontré: Snowsight > Monitoring > Query History, filtrada por usuario y ordenada por duración descendente. Es la de mayor duración del listado.
-- Tiempos: 2.9 s en total, que se descomponen en 1.3 s de compilación, 1.3 s de aprovisionamiento en cola y 192 ms de ejecución.
-- Tiempo de ejecución según el Query Profile: 1.9 s.
-- Datos leídos: unas 46.7 mil filas de `CURSO.LAB4.DAILY_ZONE_METRICS` pasan por el filtro; se escanearon 0.13 MB, 2 de 2 particiones, sin uso de caché.
-- Qué hace: calcula el rango de fechas con `MIN` y `MAX` sobre el gold, genera un día por fila con `GENERATOR` y `ROW_NUMBER`, marca los festivos con `LEFT JOIN` a `FESTIVOS_2024` y toma la lluvia del día con `MAX` agrupado por `FECHA`.
-- Captura del Query Profile: `query_profile.png` (en esta carpeta).
+- **Consulta:** la variante por zona de la pregunta B2 (`WITH con_ayer AS (...)` sobre `CURSO.T1.VW_DIARIO_ZONA`), que calcula con `LAG` los saltos de viajes de más de 50 % frente al día anterior en cada zona. Pertenece al Caso B, pregunta B2, dentro del reto R1 (`05_retos.sql`). Esta fue una de las consultas que se implementó durante el desarrollo del reto, sin embargo no fue la consulta final propuesta.
+- **ID:** `01c886dc-0209-f78a-0012-c5fa000e70c6`.
+- **Cómo la encontramos:** Snowsight > Monitoring > Query History, filtrado por el usuario `valrestrepo209` y ordenado por duración descendente. Es la consulta de mayor duración del listado: 9.1 s.
+- **Desglose del tiempo según el historial:** 533 ms de compilación, 8.2 s de espera de aprovisionamiento y 343 ms de ejecución. La duración se explica sobre todo por el arranque del warehouse, no por el cálculo.
+- **Captura del Query Profile:** `query_profile.png` [`query_profile.png`](query_profile.png). Muestra el perfil de esta misma consulta, con un tiempo total de 8.8 s.
 
 ## Lectura del Query Profile
 
-- Operador que concentra el tiempo: `TableScan [7]` sobre `CURSO.LAB4.DAILY_ZONE_METRICS`, con 33.3 % del tiempo. El 66.7 % restante es inicialización.
-- Lectura: la consulta es pequeña. La mayor parte del tiempo es el arranque del warehouse y la lectura de una tabla de 46 715 filas. En XS no hay un cuello de botella real.
-- Qué haría para reducirlo: la tabla `DAILY_ZONE_METRICS` se lee dos veces en esta consulta, una para el `MIN`/`MAX` y otra para la lluvia diaria. Lo ideal sería  fijar el rango en 2024-01-01 a 2024-03-31, que es lo que define el enunciado, y calcular la lluvia en la misma lectura. La reducción sería pequeña, porque el total ya es de 1.9 s.
+- **Operador que concentra el tiempo:** dos `TableScan` de `CURSO.T1.FACT_VIAJES_DIA`, los más caros del perfil, con 25 % cada uno (50 % juntos). El perfil marca además dos agregaciones como `Inefficient aggregate` (nodos 4 y 7). El tiempo se reparte en 50 % de lectura remota de disco y 50 % de inicialización.
+- **Por qué pasa:** la vista `VW_DIARIO_ZONA` se recalcula en cada consulta (cruce zona × día con `LEFT JOIN` a la tabla de hechos), por eso el plan lee la tabla de hechos dos veces.
+- **Qué haría para reducirlo:** Implementamos una forma diferente en la consulta empleando directamente las tablas sin requerir la vista, y redireccionando la consulta.
 
 ## Warehouse
 
-- Tamaño: X-Small.
-- Al terminar: no se suspende manualmente. Queda inactivo y se suspende solo tras el tiempo de inactividad, así que no consume créditos mientras no ejecuta consultas.
+- **Tamaño:** X-Small.
+- **Suspensión automática:** Ejecutamos esta consulta `SHOW WAREHOUSES` para validar en la columna `auto_suspend` el tiempo, el cual fue de 60 segundos.
+- **Al terminar:** no lo suspendimos manualmente. Solo fue a través de suspensión automática.
