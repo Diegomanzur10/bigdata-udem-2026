@@ -5,7 +5,7 @@ Marca los que hicieron y di dónde está cada uno.
 
 | Id | Reto | Pts | ¿Hecho? | Dónde está (archivo y línea o sección) |
 |---|---|---|---|---|
-| R1 | Un segundo caso completo (cinco preguntas más) | 3 | <sí/no> | <...> |
+| R1 | Un segundo caso completo (cinco preguntas más) | 3 | Sí |En [`05_retos.sql`](05_retos.sql) (sección R1). |
 | R2 | `DIM_FECHA` con festivos y fin de semana, usada en una consulta | 2 | Sí | En [`05_retos.sql`](05_retos.sql) (sección R2). |
 | R3 | Lluvia fuerte (más de 10 mm) frente a la línea base del mismo día de la semana (`AVG() OVER (PARTITION BY ZONA, DIA_SEMANA)`) | 3 | Sí | En [`05_retos.sql`](05_retos.sql) (sección R3). |
 | R4 | Suite de chequeos (grano, huérfanos, reconciliación con el conteo del paquete) en un solo archivo ejecutable | 3 | Sí | En [`04_chequeos.sql`](04_chequeos.sql) (uso de UNION ALL para consolidar validaciones). |
