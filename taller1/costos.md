@@ -32,7 +32,7 @@ Equipo: Valentina Restrepo Arboleda y Andres Fernando Molina Orozco · Cuenta qu
 - **ID:** `01c886dc-0209-f78a-0012-c5fa000e70c6`.
 - **Cómo la encontramos:** Snowsight > Monitoring > Query History, filtrado por el usuario `valrestrepo209` y ordenado por duración descendente. Es la consulta de mayor duración del listado: 9.1 s.
 - **Desglose del tiempo según el historial:** 533 ms de compilación, 8.2 s de espera de aprovisionamiento y 343 ms de ejecución. La duración se explica sobre todo por el arranque del warehouse, no por el cálculo.
-- **Captura del Query Profile:** `query_profile.png` [`query_profile.png`](query_profile.png). Muestra el perfil de esta misma consulta, con un tiempo total de 8.8 s.
+- **Captura del Query Profile:** [`query_profile.png`](query_profile.png). Muestra el perfil de esta misma consulta, con un tiempo total de 8.8 s.
 
 ## Lectura del Query Profile
 
