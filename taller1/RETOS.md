@@ -10,10 +10,10 @@ Marca los que hicieron y di dónde está cada uno.
 | R3 | Lluvia fuerte (más de 10 mm) frente a la línea base del mismo día de la semana (`AVG() OVER (PARTITION BY ZONA, DIA_SEMANA)`) | 3 | Sí | En [`05_retos.sql`](05_retos.sql) (sección R3). |
 | R4 | Suite de chequeos (grano, huérfanos, reconciliación con el conteo del paquete) en un solo archivo ejecutable | 3 | Sí | En [`04_chequeos.sql`](04_chequeos.sql) (uso de UNION ALL para consolidar validaciones). |
 | R5 | Rachas de alta demanda (días consecutivos sobre un umbral; el problema de «huecos e islas») | 3 | Sí | En [`05_retos.sql`](05_retos.sql) (sección R5). |
-| R6 | Tabla externa de Athena sobre el paquete (la del Lab 4, E7) y reconciliación de conteos con Snowflake: filas por mes y viajes totales, con captura de `Data scanned` | 3 | sí | Tabla evidencia en el presente archivo, en [`Imagen athenea`](AtheneaDataScaned.png) |
+| R6 | Tabla externa de Athena sobre el paquete (la del Lab 4, E7) y reconciliación de conteos con Snowflake: filas por mes y viajes totales, con captura de `Data scanned` | 3 | sí | Tabla evidencia en el presente archivo, en [`Imagen athenea`](AthenaDataScaned.png) |
 
 Para R6, si lo hacen: pega aquí la reconciliación (filas por mes y viajes totales en Athena y en Snowflake) y guarda la captura de `Data scanned` en esta carpeta.
-Se muestra resultado de Athena ![Athena](AtheneaDataScaned.png)
+Se muestra resultado de Athena ![Athena](AthenaDataScaned.png)
 
 Tabla comparativa con resultados para el reto R6 Snowflake vs Athenea
 
