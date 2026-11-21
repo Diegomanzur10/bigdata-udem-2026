@@ -5,16 +5,19 @@ locals {
   lake_arn   = "arn:aws:s3:::${var.lake_bucket}"
   script_s3  = "s3://${var.lake_bucket}/code/run_glue.py"
 
-  # Prefijos de datos del pipeline: bronze compartido, muestra para local, dev/ y prod/ por entorno;
-  # silver/ y gold/ quedan para las sesiones de SQL.
-  datos     = ["bronze", "muestra", "dev", "prod", "silver", "gold"]
+  # Prefijos de datos del pipeline: uno por entorno (dev/ y prod/). Dentro de cada uno van
+  # bronze/, silver/, gold/ y muestra/ (src/pipeline/settings.py, ruta_lake). Ya no hay carpetas
+  # de datos compartidas en la raíz del bucket.
+  datos     = ["dev", "prod"]
   lectura   = concat(["code", "tmp"], local.datos)
   escritura = concat(local.datos, ["tmp", "logs"])
   listables = concat(local.datos, ["code", "tmp", "logs"])
 
   # Perfiles del contrato: workers G.1X y timeout en minutos.
   profiles = {
-    small  = { workers = 2, timeout = 10 }
+    # small sube de 10 a 15 min: cada arranque instala snowflake-connector-python (30-90 s) y
+    # bronze, silver y gold de un mes son jobs separados, cada uno con su propia instalación.
+    small  = { workers = 2, timeout = 15 }
     medium = { workers = 4, timeout = 20 }
     large  = { workers = 6, timeout = 30 }
   }
@@ -79,6 +82,13 @@ data "aws_iam_policy_document" "glue_exec" {
     resources = [local.lake_arn]
   }
 
+  # Conexión de Snowflake para la tabla de control (pipeline.watermark). Solo ese secreto.
+  statement {
+    sid       = "LeerConexionSnowflake"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [var.snowflake_secret_arn]
+  }
+
   statement {
     sid       = "MetricasDeGlue"
     actions   = ["cloudwatch:PutMetricData"]
@@ -141,7 +151,7 @@ resource "aws_glue_job" "this" {
   default_arguments = {
     "--job-language"                     = "python"
     "--extra-py-files"                   = "s3://${var.lake_bucket}/code/pipeline.zip"
-    "--additional-python-modules"        = "pyyaml==6.0.2" # la imagen de Glue 5.0 no trae PyYAML
+    "--additional-python-modules"        = "pyyaml==6.0.2,snowflake-connector-python==3.12.4" # Glue 5.0 no trae PyYAML ni el conector
     "--enable-spark-ui"                  = "true"
     "--spark-event-logs-path"            = "s3://${var.lake_bucket}/logs/spark-ui/"
     "--enable-continuous-cloudwatch-log" = "true"
@@ -150,5 +160,6 @@ resource "aws_glue_job" "this" {
     "--TempDir"                          = "s3://${var.lake_bucket}/tmp/glue/"
     "--env"                              = var.env
     "--lake-bucket"                      = var.lake_bucket
+    "--snowflake-secret"                 = var.snowflake_secret_name
   }
 }

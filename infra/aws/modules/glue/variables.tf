@@ -9,7 +9,7 @@ variable "aws_region" {
 }
 
 variable "lake_bucket" {
-  description = "Nombre del bucket del lake (code/, bronze/, silver/, gold/, tmp/, logs/)."
+  description = "Nombre del bucket del lake (dev/, prod/, code/, tmp/, logs/)."
   type        = string
 }
 
@@ -21,5 +21,15 @@ variable "env" {
 
 variable "permissions_boundary_arn" {
   description = "ARN de la permissions boundary que llevan todos los roles IAM del modulo."
+  type        = string
+}
+
+variable "snowflake_secret_arn" {
+  description = "ARN del secreto <prefix>/snowflake (conexión de AIRFLOW_SVC). Los jobs lo leen para registrar en BIGDATA.CONTROL.WATERMARK."
+  type        = string
+}
+
+variable "snowflake_secret_name" {
+  description = "Nombre del secreto <prefix>/snowflake: se pasa al job como --snowflake-secret."
   type        = string
 }
