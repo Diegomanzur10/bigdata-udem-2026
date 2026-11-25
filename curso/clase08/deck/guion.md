@@ -1,6 +1,6 @@
 # Clase 8 · Guion del orador
 
-Martes 24 de noviembre de 2026 · 112 min · 52 slides.
+Martes 24 de noviembre de 2026 · 114 min · 53 slides.
 
 Cada slide trae el título en pantalla, su duración, la hora relativa de inicio y qué decir. Las cifras de la primera parte (bronze 1000/265/31, silver 1000 y gold de 5 filas; tras reprocesar sin deduplicar, silver 2000/530/62 y gold lee 8000) son las del ensayo de la clase 7; las de «bien hecho» son la consecuencia esperada y se confirman en clase. Las de la segunda parte (bronze 19.663.930; silver 19.650.023, con 13.907 descartados; gold 744 filas y 19.650.023 viajes; Snowflake 744 filas) y los tiempos (checks ~2 min, make actualizar-vm ~8 min la primera vez y ~1 min después, un job de Glue de gold ~16 min de reloj con 76 s de ejecución) son las medidas del ensayo en prod del 24 de noviembre, mes 2024-01.
 
@@ -164,154 +164,160 @@ Dónde: la terminal del Code Editor. Problema: no se cambia main directamente; t
 
 *3 min · inicia en 0:50*
 
-Dónde: GitHub, en el navegador. Problema: un cambio sin revisión ni verificación automática no debe llegar a main. Herramienta: el pull request y el CI. Hay que abrirlo hacia main del fork del anfitrión (GitHub a veces propone el repositorio del curso: se cambia la base). Al crearlo arrancan solos cinco checks: Ruff y pytest; Integridad de los DAGs; Terraform fmt y validate aws; Terraform fmt y validate snowflake; Terraform plan aws. Medida del ensayo: el PR #25 del 23 de noviembre tardó unos 2 minutos en los checks. En pantalla: la lista de checks bajo el PR, cada uno con un círculo amarillo que pasa a visto verde; los cinco en verde habilitan el botón de merge. Si uno sale rojo, Details, leer el error, corregir en la rama y git push: el PR se actualiza solo. Error común: Terraform plan aws falla si el fork no tiene los secrets AWS_ROLE_ARN y TF_STATE_BUCKET (make secrets); el instructor ayuda. Tiempo: 3 min. Siguiente: Otra persona aprueba, solo el anfitrión hace el merge y el Deploy queda en verde
+Dónde: GitHub, en el navegador. Problema: un cambio sin revisión ni verificación automática no debe llegar a main. Herramienta: el pull request y el CI. Hay que abrirlo hacia main del fork del anfitrión (GitHub a veces propone el repositorio del curso: se cambia la base). Al crearlo arrancan solos cinco checks: Ruff y pytest; Integridad de los DAGs; Terraform fmt y validate aws; Terraform fmt y validate snowflake; Terraform plan aws. Medida del ensayo: el PR #25 del 23 de noviembre tardó unos 2 minutos en los checks. En pantalla: la lista de checks bajo el PR, cada uno con un círculo amarillo que pasa a visto verde; los cinco en verde habilitan el botón de merge. Si uno sale rojo, Details, leer el error, corregir en la rama y git push: el PR se actualiza solo. Error común: Terraform plan aws falla si el fork no tiene los secrets AWS_ROLE_ARN y TF_STATE_BUCKET (make secrets); el instructor ayuda. Tiempo: 3 min. Siguiente: Si falla el PR o el CI: base, proveedor y secretos del fork
 
-## 28. Otra persona aprueba, solo el anfitrión hace el merge y el Deploy queda en verde
+## 28. Si falla el PR o el CI: base, proveedor, secretos
 
 *2 min · inicia en 0:53*
 
-Dónde: GitHub. Problema: nadie debe aprobar su propio cambio ni publicar sin revisión. Herramienta: la segunda barandilla después del CI. Otra persona abre Files changed y hace clic en Approve. El merge lo hace solo el anfitrión; los demás abren su PR y revisan el del anfitrión. Al hacer merge, el cambio entra a main y el workflow Deploy se dispara solo: aplica Terraform con guardia de destrucción (aborta si el plan elimina algo), empaqueta src, sincroniza dags/, code/ y framework/ en S3 y, si el push cambió airflow/ o src/, enciende la VM de Airflow de prod. En pantalla: pestaña Actions con el workflow Deploy en amarillo y luego en verde; al final, la VM de prod queda encendida. Error común: el Deploy en rojo por falta de secrets; en ese caso la VM no se enciende y no se sigue. Tiempo: 2 min. Siguiente: Con la VM encendida, el anfitrión corre make actualizar-vm para dejarla lista
+Problema: cuatro errores del pull request que ya le pasaron a estudiantes y que no tienen que ver con su código. Herramienta: la tabla. Uno: si el PR aparece en el repositorio del curso, GitHub propuso la base por defecto; en la pantalla del PR se cambia base repository al fork del anfitrión, y la rama debe partir de main actualizado. Dos: «Failed to install provider… context deadline exceeded» es la descarga del proveedor de Terraform que se agotó; se pulsa Re-run failed jobs y casi siempre pasa. Tres: «Faltan los secrets AWS_ROLE_ARN y/o TF_STATE_BUCKET» en el check Terraform plan: el anfitrión corre cd ~/bigdata && make secrets una vez, con gh autenticado (gh auth login), y repite el job; los secretos salen del bootstrap de su cuenta. Cuatro: «There isn't anything to compare» significa que la rama no tiene commits propios: faltó git add y git commit antes de git push. Error común: arreglar el código cuando el fallo es de red o de configuración del fork. Tiempo: 2 min. Siguiente: Otra persona aprueba, solo el anfitrión hace el merge y el Deploy queda en verde
 
-## 29. Con la VM encendida, el anfitrión corre make actualizar-vm para dejarla lista
+## 29. Otra persona aprueba, solo el anfitrión hace el merge y el Deploy queda en verde
 
 *2 min · inicia en 0:55*
 
-Problema: tras el Deploy la VM está encendida, pero todavía no apunta al secreto de Snowflake de prod: sin este paso, cargar_snowflake falla. Herramienta: make actualizar-vm, que deja la VM con el secreto bigdata/snowflake_prod y reinicia Airflow de prod. Lo corre el anfitrión (o el instructor) la primera vez, con la VM encendida. Medida del ensayo: unos 8 minutos la primera vez, porque construye la imagen; alrededor de 1 minuto las siguientes. Hay que repetirlo cada vez que el merge cambie airflow/docker-compose.yaml o algo dentro de airflow/vm/: en el ensayo hubo que repetirlo porque el PR #25 cambió esos archivos. Salida esperada: el script termina sin error y Airflow de prod reinicia. Mientras tarda, se avanza con las tablas de Athena. Error común: correrlo con la VM apagada; se espera a que el Deploy la encienda (unos 2 minutos). Tiempo: 2 min. Siguiente: Apagas el Airflow de dev y abres el túnel a prod por el mismo puerto 8080
+Dónde: GitHub. Problema: nadie debe aprobar su propio cambio ni publicar sin revisión. Herramienta: la segunda barandilla después del CI. Otra persona abre Files changed y hace clic en Approve. El merge lo hace solo el anfitrión; los demás abren su PR y revisan el del anfitrión. Al hacer merge, el cambio entra a main y el workflow Deploy se dispara solo: aplica Terraform con guardia de destrucción (aborta si el plan elimina algo), empaqueta src, sincroniza dags/, code/ y framework/ en S3 y, si el push cambió airflow/ o src/, enciende la VM de Airflow de prod. En pantalla: pestaña Actions con el workflow Deploy en amarillo y luego en verde; al final, la VM de prod queda encendida. Error común: el Deploy en rojo por falta de secrets; en ese caso la VM no se enciende y no se sigue. Tiempo: 2 min. Siguiente: Con la VM encendida, el anfitrión corre make actualizar-vm para dejarla lista
 
-## 30. Apagas el Airflow de dev y abres el túnel a prod por el mismo puerto 8080
+## 30. Con la VM encendida, el anfitrión corre make actualizar-vm para dejarla lista
 
 *2 min · inicia en 0:57*
 
-Problema: la VM de prod no tiene entrada pública; su interfaz solo se alcanza por un túnel desde el Code Editor. Y el Airflow de dev y el de prod usan el mismo puerto 8080, así que primero se apaga el de dev. Entrada: make airflow-local-down y luego make airflow-tunel. Salida esperada: el túnel imprime la URL a abrir; la terminal queda ocupada, se deja abierta y se abre otra con Terminal > New Terminal. Si la VM no está encendida: make airflow-on. Errores comunes (del borrador de la clase 7, no se reprodujeron en el ensayo): «El puerto 8080 está ocupado» significa que el Airflow de dev sigue encendido; «La instancia está stopped» pide make airflow-on; «No existe la instancia bigdata-airflow» pide make airflow-habilitar, una sola vez. Solo el anfitrión y el instructor abren el túnel; el resto sigue en el proyector. Tiempo: 2 min. Siguiente: Entras a Airflow de prod con admin y reconoces dos DAGs fantasma que se ignoran
+Problema: tras el Deploy la VM está encendida, pero todavía no apunta al secreto de Snowflake de prod: sin este paso, cargar_snowflake falla. Herramienta: make actualizar-vm, que deja la VM con el secreto bigdata/snowflake_prod y reinicia Airflow de prod. Lo corre el anfitrión (o el instructor) la primera vez, con la VM encendida. Medida del ensayo: unos 8 minutos la primera vez, porque construye la imagen; alrededor de 1 minuto las siguientes. Hay que repetirlo cada vez que el merge cambie airflow/docker-compose.yaml o algo dentro de airflow/vm/: en el ensayo hubo que repetirlo porque el PR #25 cambió esos archivos. Salida esperada: el script termina sin error y Airflow de prod reinicia. Mientras tarda, se avanza con las tablas de Athena. Error común: correrlo con la VM apagada; se espera a que el Deploy la encienda (unos 2 minutos). Tiempo: 2 min. Siguiente: Apagas el Airflow de dev y abres el túnel a prod por el mismo puerto 8080
 
-## 31. Entras a Airflow de prod con admin y reconoces dos DAGs fantasma que se ignoran
+## 31. Apagas el Airflow de dev y abres el túnel a prod por el mismo puerto 8080
 
 *2 min · inicia en 0:59*
 
+Problema: la VM de prod no tiene entrada pública; su interfaz solo se alcanza por un túnel desde el Code Editor. Y el Airflow de dev y el de prod usan el mismo puerto 8080, así que primero se apaga el de dev. Entrada: make airflow-local-down y luego make airflow-tunel. Salida esperada: el túnel imprime la URL a abrir; la terminal queda ocupada, se deja abierta y se abre otra con Terminal > New Terminal. Si la VM no está encendida: make airflow-on. Errores comunes (del borrador de la clase 7, no se reprodujeron en el ensayo): «El puerto 8080 está ocupado» significa que el Airflow de dev sigue encendido; «La instancia está stopped» pide make airflow-on; «No existe la instancia bigdata-airflow» pide make airflow-habilitar, una sola vez. Solo el anfitrión y el instructor abren el túnel; el resto sigue en el proyector. Tiempo: 2 min. Siguiente: Entras a Airflow de prod con admin y reconoces dos DAGs fantasma que se ignoran
+
+## 32. Entras a Airflow de prod con admin y reconoces dos DAGs fantasma que se ignoran
+
+*2 min · inicia en 1:01*
+
 Problema: ¿cómo se sabe que se está en el Airflow de prod y no en el de dev? Herramienta: la contraseña. En otra terminal: cd ~/bigdata y make airflow-password; imprime «Usuario: admin» y «Contraseña: ...», que es distinta a la de dev. La interfaz de prod usa SimpleAuthManager con esa contraseña. En pantalla: la lista de DAGs con pipeline_taxi y resetear_entorno, y además dos DAGs fantasma, hola_airflow e ingesta_mensual. Son solo registros viejos en la base de Airflow de la VM, no son archivos: se ignoran, no se borran ni se activan. El encabezado de cada tarea dice PROD. Errores comunes: la pantalla en blanco (se abrió la URL de dev y no la del túnel); «Invalid or Expired Auth Token» (se vuelve a abrir la URL del túnel). Tiempo: 2 min. Siguiente: Creas en Athena las ocho tablas prod_ reemplazando ENTORNO por prod
 
-## 32. Creas en Athena las ocho tablas prod_ reemplazando ENTORNO por prod
+## 33. Creas en Athena las ocho tablas prod_ reemplazando ENTORNO por prod
 
-*3 min · inicia en 1:01*
+*3 min · inicia en 1:03*
 
 Dónde: la consola de Athena. Problema: las tablas prod_ no existen todavía, y sin ellas no se puede validar nada. Herramienta: el archivo curso/clase07/athena/01_tablas.sql, con dos marcadores: <ENTORNO> se reemplaza por prod y <CUENTA> por el ID de la cuenta AWS. Son 8 sentencias CREATE EXTERNAL TABLE: prod_bronze_fhvhv, prod_bronze_clima, prod_bronze_taxi_zones, prod_silver_fhvhv, prod_silver_clima, prod_silver_taxi_zones, prod_gold_tarifa_por_milla_barrio y prod_crudo_fhvhv. Workgroup bigdata-wg y base bigdata_lake. En pantalla: el editor de consultas con el workgroup seleccionado arriba a la derecha y, tras cada sentencia, «Query successful». Se ejecutan de una en una, no todas pegadas. Para comprobarlo: SHOW TABLES IN bigdata_lake debe listar las ocho con prefijo prod_. Error común: dejar un marcador sin reemplazar, que da un error de ruta o de nombre; se usa Ctrl+F y reemplazar todo. Tiempo: 3 min. Siguiente: Primero te das el rol BIGDATA_PROD, porque ACCOUNTADMIN no puede crear en PROD
 
-## 33. Primero te das el rol BIGDATA_PROD, porque ACCOUNTADMIN no puede crear en PROD
+## 34. Primero te das el rol BIGDATA_PROD, porque ACCOUNTADMIN no puede crear en PROD
 
-*3 min · inicia en 1:04*
+*3 min · inicia en 1:06*
 
 Problema: en Snowflake la tabla de prod no la crea el pipeline: se crea a mano, y el obstáculo es de permisos. BIGDATA_PROD es el rol de Airflow en la VM y no está asignado a ningún usuario de Snowsight; y ACCOUNTADMIN no tiene CREATE TABLE en BIGDATA.PROD, ese permiso solo lo tiene BIGDATA_PROD. Herramienta: darse a uno mismo el rol BIGDATA_PROD con ACCOUNTADMIN. Entrada, en Snowsight, con rol ACCOUNTADMIN: primero SELECT CURRENT_USER(); para ver el usuario tal cual (en minúsculas), y luego el GRANT con ese nombre entre comillas dobles. Salida esperada: «Statement executed successfully». Error común: la forma con IDENTIFIER($yo) dio «Object does not exist» en el ensayo; se usa el nombre literal con comillas. Y no se usa GRANT OWNERSHIP: no hace falta y deja permisos que luego estorban. Es un permiso de curso en una cuenta de curso; en una empresa esto lo da quien administra los roles. Tiempo: 3 min. Siguiente: Con BIGDATA_PROD creas a mano la tabla TARIFA_POR_MILLA_BARRIO en PROD
 
-## 34. Con BIGDATA_PROD creas a mano la tabla TARIFA_POR_MILLA_BARRIO en PROD
+## 35. Con BIGDATA_PROD creas a mano la tabla TARIFA_POR_MILLA_BARRIO en PROD
 
-*3 min · inicia en 1:07*
+*3 min · inicia en 1:09*
 
 Problema: con el rol ya asignado, falta la tabla de destino; sin ella, cargar_snowflake falla con un mensaje que trae el SQL a ejecutar (código 002003). Herramienta: crear la tabla con BIGDATA_PROD, que es el rol que escribe en prod. Entrada: las cuatro sentencias USE y el CREATE TABLE IF NOT EXISTS en Snowsight; IF NOT EXISTS hace que repetirlo sea inofensivo. Tipos: date es DATE, string es VARCHAR, bigint es NUMBER(38,0), double es FLOAT. Salida esperada: «Table TARIFA_POR_MILLA_BARRIO successfully created» o, si ya existe, un aviso de que ya existía. No se crea con ACCOUNTADMIN ni se usa GRANT OWNERSHIP. Los equipos con tablas propias crean BIGDATA.PROD.<EQUIPO>_<TABLA> con su propio DDL, igual a su gold. Error común: «Insufficient privileges» o «does not exist» por no haber hecho USE ROLE BIGDATA_PROD antes. Tiempo: 3 min. Siguiente: Si prod trae datos viejos, resetear_entorno lo vacía y exige el ID de la cuenta
 
-## 35. Si prod trae datos viejos, resetear_entorno lo vacía y exige el ID de la cuenta
+## 36. Si prod trae datos viejos, resetear_entorno lo vacía y exige el ID de la cuenta
 
-*3 min · inicia en 1:10*
+*3 min · inicia en 1:12*
 
 Problema: prod puede traer datos de ensayos anteriores, y sumar encima inflaría todo. La evidencia está en la slide siguiente. Herramienta: el DAG resetear_entorno en el Airflow de prod. Se corre solo si prod ya tiene datos. Siempre primero con solo_listar marcado: muestra el plan, no borra nada. Después se desmarca. En dev basta escribir «borrar dev»; en prod la confirmación exige además el ID de la cuenta AWS de 12 dígitos: «borrar prod <ID>». Salida esperada con solo_listar: la lista de lo que se borraría. Salida esperada en el reset real: las tareas en verde y prod vacío. Error común: «La confirmación no coincide: no se borró nada», que sale en la tarea validar cuando falta el ID o está mal escrito; no es un error del sistema, es una barandilla que cumplió su trabajo. Se corrige la confirmación y se lanza de nuevo. Tiempo: 3 min. Siguiente: 530.550.621
 
-## 36. Slide 36
+## 37. Slide 37
 
-*1 min · inicia en 1:13*
+*1 min · inicia en 1:15*
 
 Problema: ¿por qué tanto cuidado con el reset? Herramienta: la evidencia. Antes del reset, prod acumulaba 58.950.069 viajes en silver y 530.550.621 en gold: ensayos previos sumados encima, a pesar de que un mes de enero tiene unos 19,65 millones. Gold cuadraba con una suma de varias corridas, no con una. Después del reset y de una corrida limpia, todo cuadró, como se ve más adelante. Lección: una cifra inflada no da error, solo da una respuesta equivocada con aspecto de correcta; la conciliación entre capas la detecta, y el reset la corrige. Tiempo: 1 min. Siguiente: Lanzas pipeline_taxi en prod con glue_medium, todos y 2024-01, sin reprocesar
 
-## 37. Lanzas pipeline_taxi en prod con glue_medium, todos y 2024-01, sin reprocesar
+## 38. Lanzas pipeline_taxi en prod con glue_medium, todos y 2024-01, sin reprocesar
 
-*3 min · inicia en 1:14*
+*3 min · inicia en 1:16*
 
 Dónde: Airflow de prod. Problema: lanzar el pipeline y saber qué mirar mientras corre. Entrada: activar pipeline_taxi y hacer clic en Trigger con Params. En prod el formulario no deja elegir el entorno, ni code_editor, ni un límite: el cómputo ofrece glue_small, glue_medium y glue_large, el límite solo «todos», y el mes arranca en 2024-01 (un mes vacío lanzaría los doce meses). Se deja glue_medium, todos, 2024-01 y reprocesar sin marcar. Corre bronze, silver y gold en Glue (bigdata-medium) y luego cargar_snowflake; escribe en s3://<lake>/prod/, anota en BIGDATA.CONTROL_PROD.WATERMARK y carga en BIGDATA.PROD con el rol BIGDATA_PROD. En pantalla: cuatro tareas que pasan de gris a verde. Paciencia: cada job de Glue puede tardar varios minutos en arrancar; hoy un job de gold esperó unos 16 min de reloj con solo 76 s de ejecución. No es un fallo. Mientras tanto se puede abrir el log de correr_bronze: el encabezado dice PROD. Errores comunes: cargar_snowflake falla con código 002003 si falta la tabla de prod (se vuelve a la slide de la tabla); «Falta la variable de entorno LAKE_BUCKET» se explica en la slide de mediciones. Tiempo: 3 min. Siguiente: El ensayo midió los tiempos y encontró un fallo real, ya corregido en main
 
-## 38. El ensayo midió los tiempos y encontró un fallo real, ya corregido en main
+## 39. El ensayo midió los tiempos y encontró un fallo real, ya corregido en main
 
-*2 min · inicia en 1:17*
+*2 min · inicia en 1:19*
 
 Problema: sin medidas reales, nadie sabe cuánto esperar ni qué es normal. Herramienta: la tabla con lo medido en el ensayo. Checks del PR: unos 2 minutos (PR #25). make actualizar-vm: unos 8 minutos la primera vez y 1 minuto después. Un job de gold: 76 segundos de ejecución pero unos 16 minutos de reloj, porque Glue tarda en arrancar. Fallo real encontrado y corregido ese día en el PR #25: sin LAKE_BUCKET en los contenedores de la VM, correr_bronze fallaba en 5 segundos con «Falta la variable de entorno LAKE_BUCKET»; quedó corregido en main (archivo lake.env), y por eso el merge cambió airflow/ y hubo que repetir make actualizar-vm. Segunda corrida con reprocesar=false: bronze se salta por el watermark, silver y gold se recalculan (silver leyó=19.650.023) y el paso de gold, SE SALTÓ porque ya estaba registrado. Un SE SALTÓ no es un fallo, es la puerta funcionando. Tiempo: 2 min. Siguiente: En Athena, silver y gold de prod concilian: 19.650.023 viajes
 
-## 39. En Athena, silver y gold de prod concilian: 19.650.023 viajes
+## 40. En Athena, silver y gold de prod concilian: 19.650.023 viajes
 
-*3 min · inicia en 1:19*
+*3 min · inicia en 1:21*
 
 Problema: que el DAG termine en verde no prueba que las cifras estén bien; hay que conciliar. Dónde: Athena, workgroup bigdata-wg, base bigdata_lake. Entrada: la consulta de arriba compara bronze, silver y gold de enero. Cifras esperadas, medidas en el ensayo con la corrida limpia: bronze fhvhv 19.663.930; silver fhvhv 19.650.023 (limpiar_viajes descartó 13.907 filas); suma de viajes en gold 19.650.023, igual a silver: conciliación exacta. Segunda consulta: gold tiene 744 filas y 31 días. Clima: 31 filas en bronze y 31 en silver. Si gold no es igual a silver y la razón es un factor exacto (×2, ×8), silver tiene duplicados: es el efecto que vimos en la parte 1. Si Athena devuelve 0 filas, la tabla apunta a otro entorno o prod no corrió el paso. Error común: validar sin reemplazar dev_ por prod_ en las consultas copiadas de la clase 7. Tiempo: 3 min. Siguiente: En Snowflake, la tabla de prod y la tabla de control cuadran con Athena
 
-## 40. En Snowflake, la tabla de prod y la tabla de control cuadran con Athena
+## 41. En Snowflake, la tabla de prod y la tabla de control cuadran con Athena
 
-*3 min · inicia en 1:22*
+*3 min · inicia en 1:24*
 
 Problema: la prueba final es que lo que se cargó en Snowflake coincida con lo que hay en Athena y que el control lo haya registrado. Dónde: Snowsight, con BIGDATA_DEV, que puede leer PROD y CONTROL_PROD pero no escribir. Entrada: dos consultas, ya probadas con el rol BIGDATA_DEV en el ensayo. La primera, sobre BIGDATA.PROD.TARIFA_POR_MILLA_BARRIO: 744 filas, SUM(VIAJES) = 19.650.023 y 31 días, igual que silver y gold en Athena. La segunda, sobre BIGDATA.CONTROL_PROD.WATERMARK: deben aparecer los registros de bronze, silver, gold y snowflake, con las columnas FUENTE, CAPA, TABLA, MES, FILAS, REPROCESAR, COMPUTO, LIMITE y LEIDAS; COMPUTO glue_medium y LIMITE todos. Las filas de gold cuentan filas de gold, no viajes. Si SUM(VIAJES) no cuadra con silver, se vuelve a la slide del reset. Error común: olvidar el USE ROLE y leer con un rol sin acceso. Tiempo: 3 min. Siguiente: El tipo de job se elige por corrida, no por tarea
 
-## 41. El tipo de job se elige por corrida, no por tarea
+## 42. El tipo de job se elige por corrida, no por tarea
 
-*2 min · inicia en 1:25*
+*2 min · inicia en 1:27*
 
 Problema: alguien pregunta dónde se cambia el tipo de job de cada tarea del DAG. Herramienta: el formulario Trigger con Params. El campo computo vale para toda la corrida: bronze, silver y gold lo reciben igual y lanzan el job de Glue de ese perfil (bigdata-small, bigdata-medium o bigdata-large). cargar_snowflake no usa Glue. En prod el formulario solo ofrece glue_small, glue_medium y glue_large, y el límite queda en todos. Cuántos workers tiene cada perfil (2, 4 y 6) está en airflow/framework/profiles.yaml: cambiarlo es un PR. No hay un cómputo distinto por tarea; para probar otro, se lanza otra corrida. Error común: creer que el cómputo se cambia en el código del DAG; se cambia al lanzar. Siguiente: Lanzas el DAG tres veces, cambiando solo `computo`
 
-## 42. Lanzas el DAG tres veces, cambiando solo `computo`
+## 43. Lanzas el DAG tres veces, cambiando solo `computo`
 
-*3 min · inicia en 1:27*
+*3 min · inicia en 1:29*
 
 Dónde: Airflow de prod. Problema: medir cuánto cambia el tiempo y el costo con cada cómputo sin tocar los datos. Herramienta: tres corridas con Reprocesar apagado. Con la regla de la puerta, bronze se salta, pero silver y gold se recalculan en cada corrida y sobrescriben su mes: los datos quedan iguales. Cada corrida tarda unos 5 minutos; deja una lanzada y avanza mientras corre, porque el DAG solo admite una corrida a la vez (max_active_runs=1). En Grid, el inicio y el fin de cada tarea salen al pasar el cursor. Error común: dejar Reprocesar marcado y duplicar los datos sin querer. Siguiente: Más workers no acortaron el DAG y sí encarecieron la corrida
 
-## 43. Más workers no acortaron el DAG y sí encarecieron la corrida
+## 44. Más workers no acortaron el DAG y sí encarecieron la corrida
 
-*3 min · inicia en 1:30*
+*3 min · inicia en 1:32*
 
 Problema: ¿qué cómputo conviene en prod? Herramienta: la medición del ensayo del 24 de noviembre, mes 2024-01 con todos los viajes (19,6 millones), Reprocesar apagado. Las tres corridas duran casi lo mismo, unos 4 minutos y medio, porque cada job de Glue tarda más de un minuto en arrancar y el trabajo de silver y gold en sí es de menos de un minuto. Lo que sí cambia es lo que se paga: los DPU·segundo de Glue (cada worker G.1X es 1 DPU) pasan de 359 a 754 y a 1 140. El costo aproximado sale de multiplicar por US$0,44 por DPU-hora, la tarifa pública de Glue en esta región; confírmala en la página de precios. Conclusión: con este tamaño de datos, glue_small basta; más workers solo ayudan cuando el trabajo útil supera al arranque. Error común: comparar tiempos de una corrida limpia contra una con Reprocesar marcado: procesa el doble de datos y no es comparable. Siguiente: Lanzas con Reprocesar marcado y lees la suma en Snowflake
 
-## 44. Lanzas con Reprocesar marcado y lees la suma en Snowflake
+## 45. Lanzas con Reprocesar marcado y lees la suma en Snowflake
 
-*3 min · inicia en 1:33*
+*3 min · inicia en 1:35*
 
 Dónde: Airflow de prod y Snowsight. Problema: ver con los propios ojos que la lógica actual duplica los datos. Herramienta: la misma corrida con Reprocesar marcado. La puerta se abre, bronze escribe un segundo lote, silver lo lee junto con el primero porque deduplicar todavía no deduplica, y gold multiplica. Las consultas son las de la slide de validación en Snowflake: COUNT(*) y SUM(VIAJES) sobre BIGDATA.PROD.TARIFA_POR_MILLA_BARRIO. En el ensayo el DAG tardó unos 8 minutos con glue_medium (más datos que una corrida limpia). Error común: pensar que la tabla se rompió porque no hubo ningún error; no lo hubo, y esa es la lección. Siguiente: ×8
 
-## 45. Slide 45
-
-*2 min · inicia en 1:36*
-
-Problema: nadie recibe un error y la cifra de gold queda ocho veces inflada, esta vez en la tabla que consumiría el negocio. Primero, bronze: reprocesar escribe un segundo lote. Segundo, silver: lee los dos lotes y guarda cada fila dos veces (39,3 millones de filas en vez de 19,6). Tercero, gold: las tablas de silver se unen y multiplican las filas, hasta ocho veces. El número de filas de gold sigue en 744, así que nadie lo nota. Por eso el trabajo de ustedes (deduplicar y agregar metadatos) no es opcional. Para dejar prod limpio otra vez: resetear_entorno con entorno prod y la confirmación «borrar prod» más el ID de la cuenta, y volver a correr. Tiempo: 2 min. Siguiente: Tres riesgos conocidos: uno no frena nada y dos limitan quién lanza prod
-
-## 46. Tres riesgos conocidos: uno no frena nada y dos limitan quién lanza prod
+## 46. Slide 46
 
 *2 min · inicia en 1:38*
 
-Problema: hay cosas que se ven mal y no lo están, y otras que sí son límites reales. Herramienta: la lista de riesgos conocidos, dichos antes de que alguien se asuste. (a) cargar_snowflake en la VM imprime «No pude leer bigdata_lake.prod_gold_... en el catálogo de Athena: tu rol no tiene permiso sobre el catálogo de Glue»: es un aviso, no frena la carga. (b) El Deploy solo publica en la cuenta del anfitrión: los demás integrantes empujan al fork del anfitrión, su VM no recibe el código ni se enciende; siguen la demostración en el proyector o miran el PR. (c) La interfaz de Airflow de prod usa SimpleAuthManager con la contraseña de make airflow-password: es una barandilla de curso, no un control de empresa; en una empresa iría detrás de un proveedor de identidad. Y una más: los DAGs fantasma hola_airflow e ingesta_mensual son registros viejos de la base. Tiempo: 2 min. Siguiente: Si algo falla al preparar: rama vieja, migración, VM, Deploy y variable de entorno
+Problema: nadie recibe un error y la cifra de gold queda ocho veces inflada, esta vez en la tabla que consumiría el negocio. Primero, bronze: reprocesar escribe un segundo lote. Segundo, silver: lee los dos lotes y guarda cada fila dos veces (39,3 millones de filas en vez de 19,6). Tercero, gold: las tablas de silver se unen y multiplican las filas, hasta ocho veces. El número de filas de gold sigue en 744, así que nadie lo nota. Por eso el trabajo de ustedes (deduplicar y agregar metadatos) no es opcional. Para dejar prod limpio otra vez: resetear_entorno con entorno prod y la confirmación «borrar prod» más el ID de la cuenta, y volver a correr. Tiempo: 2 min. Siguiente: Tres riesgos conocidos: uno no frena nada y dos limitan quién lanza prod
 
-## 47. Si algo falla al preparar: rama, migración, VM, Deploy y entorno
+## 47. Tres riesgos conocidos: uno no frena nada y dos limitan quién lanza prod
 
 *2 min · inicia en 1:40*
 
-Problema: algo va a fallar, y en el ensayo los fallos costaron más tiempo que los pasos. Herramienta: tres tablas error, causa, qué hacer, con lo que sí apareció, en el orden en que se encuentra. Esta primera es de preparación. «Your local changes would be overwritten» al hacer git switch main: el Code Editor quedó en una rama vieja; git stash y repetir. «Schema BIGDATA.CONTROL_DEV does not exist»: falta la migración; cd ~/bigdata y make migrar-clase07. El Deploy no enciende la VM: el cambio no tocó src/ ni airflow/; se agrega un cambio en src/. «Falta la variable de entorno LAKE_BUCKET» en correr_bronze (falla en 5 s): la VM corre un main sin lake.env; ya está corregido en main (PR #25), se hace el merge y se repite make actualizar-vm. Tiempo: 2 min. Siguiente: Si algo falla en Snowflake o en el reset: causa y qué hacer
+Problema: hay cosas que se ven mal y no lo están, y otras que sí son límites reales. Herramienta: la lista de riesgos conocidos, dichos antes de que alguien se asuste. (a) cargar_snowflake en la VM imprime «No pude leer bigdata_lake.prod_gold_... en el catálogo de Athena: tu rol no tiene permiso sobre el catálogo de Glue»: es un aviso, no frena la carga. (b) El Deploy solo publica en la cuenta del anfitrión: los demás integrantes empujan al fork del anfitrión, su VM no recibe el código ni se enciende; siguen la demostración en el proyector o miran el PR. (c) La interfaz de Airflow de prod usa SimpleAuthManager con la contraseña de make airflow-password: es una barandilla de curso, no un control de empresa; en una empresa iría detrás de un proveedor de identidad. Y una más: los DAGs fantasma hola_airflow e ingesta_mensual son registros viejos de la base. Tiempo: 2 min. Siguiente: Si algo falla al preparar: rama, migración, VM, Deploy y entorno
 
-## 48. Si algo falla en Snowflake o en el reset: causa y qué hacer
+## 48. Si algo falla al preparar: rama, migración, VM, Deploy y entorno
 
 *2 min · inicia en 1:42*
 
-Segunda tabla: Snowflake y el reset, donde está lo más fácil de confundir. «Object does not exist» en el GRANT: se usó IDENTIFIER($yo); se escribe el usuario literal, con comillas y en minúsculas, tal cual lo devuelve SELECT CURRENT_USER(). ACCOUNTADMIN sin CREATE TABLE en BIGDATA.PROD: solo BIGDATA_PROD tiene ese permiso; se asigna el rol con GRANT y se crea con él; nunca GRANT OWNERSHIP. cargar_snowflake con código 002003: falta la tabla de prod; el mensaje trae el SQL y se ejecuta con BIGDATA_PROD. «La confirmación no coincide: no se borró nada» en la tarea validar de resetear_entorno: en prod la confirmación exige «borrar prod <ID de 12 dígitos>»; es una barandilla, no un fallo; se corrige el texto y se relanza. Tiempo: 2 min. Siguiente: Cuatro mensajes parecen errores y no lo son: se leen y se sigue
+Problema: algo va a fallar, y en el ensayo los fallos costaron más tiempo que los pasos. Herramienta: tres tablas error, causa, qué hacer, con lo que sí apareció, en el orden en que se encuentra. Esta primera es de preparación. «Your local changes would be overwritten» al hacer git switch main: el Code Editor quedó en una rama vieja; git stash y repetir. «Schema BIGDATA.CONTROL_DEV does not exist»: falta la migración; cd ~/bigdata y make migrar-clase07. El Deploy no enciende la VM: el cambio no tocó src/ ni airflow/; se agrega un cambio en src/. «Falta la variable de entorno LAKE_BUCKET» en correr_bronze (falla en 5 s): la VM corre un main sin lake.env; ya está corregido en main (PR #25), se hace el merge y se repite make actualizar-vm. Tiempo: 2 min. Siguiente: Si algo falla en Snowflake o en el reset: causa y qué hacer
 
-## 49. Cuatro mensajes parecen errores y no lo son: se leen y se sigue
+## 49. Si algo falla en Snowflake o en el reset: causa y qué hacer
 
 *2 min · inicia en 1:44*
 
-Tercera tabla: lo que parece un error y no lo es. Es la que más preguntas genera, por eso va aparte. El aviso «No pude leer bigdata_lake.prod_gold_... en el catálogo de Athena: tu rol no tiene permiso sobre el catálogo de Glue» sale en cargar_snowflake y no frena la carga. Un job de Glue que tarda mucho en arrancar es normal: hoy un job de gold esperó unos 16 minutos de reloj con 76 segundos de ejecución; se espera. SE SALTÓ en una segunda corrida es la puerta de bronze funcionando (watermark), y silver y gold se recalculan. Los DAGs hola_airflow e ingesta_mensual son registros viejos de la base de Airflow de la VM, no son archivos: se ignoran. Regla práctica: ante un mensaje raro, se lee entero; en esta clase casi todos traen la causa y el SQL que falta. Tiempo: 2 min. Siguiente: Checklist del anfitrión: de la migración a la validación en prod
+Segunda tabla: Snowflake y el reset, donde está lo más fácil de confundir. «Object does not exist» en el GRANT: se usó IDENTIFIER($yo); se escribe el usuario literal, con comillas y en minúsculas, tal cual lo devuelve SELECT CURRENT_USER(). ACCOUNTADMIN sin CREATE TABLE en BIGDATA.PROD: solo BIGDATA_PROD tiene ese permiso; se asigna el rol con GRANT y se crea con él; nunca GRANT OWNERSHIP. cargar_snowflake con código 002003: falta la tabla de prod; el mensaje trae el SQL y se ejecuta con BIGDATA_PROD. «La confirmación no coincide: no se borró nada» en la tarea validar de resetear_entorno: en prod la confirmación exige «borrar prod <ID de 12 dígitos>»; es una barandilla, no un fallo; se corrige el texto y se relanza. Tiempo: 2 min. Siguiente: Cuatro mensajes parecen errores y no lo son: se leen y se sigue
 
-## 50. Checklist del anfitrión: de la migración a la validación en prod
+## 50. Cuatro mensajes parecen errores y no lo son: se leen y se sigue
 
 *2 min · inicia en 1:46*
 
-Problema: llegar al final de la sesión sin saber qué falta. Cada rol recorre su lista. Anfitrión, en orden: 1) prerrequisito: cd ~/bigdata, git switch main, git pull y make migrar-clase07; 2) merge del PR con los cinco checks en verde, y Deploy en verde; 3) make actualizar-vm; 4) túnel y contraseña, y entra a Airflow de prod; 5) tablas prod_ en Athena y tabla de Snowflake con BIGDATA_PROD; 6) reset si hace falta, pipeline_taxi y validar con las cifras: 744 filas, 19.650.023 viajes, 31 días. Fuente de cada casilla: las slides anteriores, en el mismo orden. Errores comunes: saltar el prerrequisito, o hacer merge con un check en rojo. Tiempo: 2 min. Siguiente: Checklist del resto del equipo: rama, PR, revisión y seguir la demo
+Tercera tabla: lo que parece un error y no lo es. Es la que más preguntas genera, por eso va aparte. El aviso «No pude leer bigdata_lake.prod_gold_... en el catálogo de Athena: tu rol no tiene permiso sobre el catálogo de Glue» sale en cargar_snowflake y no frena la carga. Un job de Glue que tarda mucho en arrancar es normal: hoy un job de gold esperó unos 16 minutos de reloj con 76 segundos de ejecución; se espera. SE SALTÓ en una segunda corrida es la puerta de bronze funcionando (watermark), y silver y gold se recalculan. Los DAGs hola_airflow e ingesta_mensual son registros viejos de la base de Airflow de la VM, no son archivos: se ignoran. Regla práctica: ante un mensaje raro, se lee entero; en esta clase casi todos traen la causa y el SQL que falta. Tiempo: 2 min. Siguiente: Checklist del anfitrión: de la migración a la validación en prod
 
-## 51. Checklist del resto del equipo: rama, PR, revisión y seguir la demo
+## 51. Checklist del anfitrión: de la migración a la validación en prod
 
 *2 min · inicia en 1:48*
 
-Problema: el resto del equipo no lanza prod, pero tiene trabajo que hacer y que revisar. Lista para quien no es anfitrión: 1) el mismo prerrequisito: cd ~/bigdata, git switch main, git pull y make migrar-clase07 (sin él, el reset falla en su Code Editor); 2) rama propia con cambio pequeño en src/ y make test en verde, y PR hacia main del fork del anfitrión; 3) revisar y aprobar el PR de otra persona (nadie aprueba el suyo); 4) seguir la demostración de prod en el proyector, porque el Deploy solo publica en la cuenta del anfitrión; 5) correr las consultas de validación con sus propias tablas, si las tienen, en BIGDATA.PROD.<EQUIPO>_<TABLA>; 6) al terminar, apagar lo que cobra. Error común: esperar ver el DAG de prod en la VM propia; no existe, su Deploy no corre. Tiempo: 2 min. Siguiente: Antes de cerrar apagas el túnel y la VM, y confirmas con make estado
+Problema: llegar al final de la sesión sin saber qué falta. Cada rol recorre su lista. Anfitrión, en orden: 1) prerrequisito: cd ~/bigdata, git switch main, git pull y make migrar-clase07; 2) merge del PR con los cinco checks en verde, y Deploy en verde; 3) make actualizar-vm; 4) túnel y contraseña, y entra a Airflow de prod; 5) tablas prod_ en Athena y tabla de Snowflake con BIGDATA_PROD; 6) reset si hace falta, pipeline_taxi y validar con las cifras: 744 filas, 19.650.023 viajes, 31 días. Fuente de cada casilla: las slides anteriores, en el mismo orden. Errores comunes: saltar el prerrequisito, o hacer merge con un check en rojo. Tiempo: 2 min. Siguiente: Checklist del resto del equipo: rama, PR, revisión y seguir la demo
 
-## 52. Antes de cerrar apagas el túnel y la VM, y confirmas con make estado
+## 52. Checklist del resto del equipo: rama, PR, revisión y seguir la demo
 
 *2 min · inicia en 1:50*
+
+Problema: el resto del equipo no lanza prod, pero tiene trabajo que hacer y que revisar. Lista para quien no es anfitrión: 1) el mismo prerrequisito: cd ~/bigdata, git switch main, git pull y make migrar-clase07 (sin él, el reset falla en su Code Editor); 2) rama propia con cambio pequeño en src/ y make test en verde, y PR hacia main del fork del anfitrión; 3) revisar y aprobar el PR de otra persona (nadie aprueba el suyo); 4) seguir la demostración de prod en el proyector, porque el Deploy solo publica en la cuenta del anfitrión; 5) correr las consultas de validación con sus propias tablas, si las tienen, en BIGDATA.PROD.<EQUIPO>_<TABLA>; 6) al terminar, apagar lo que cobra. Error común: esperar ver el DAG de prod en la VM propia; no existe, su Deploy no corre. Tiempo: 2 min. Siguiente: Antes de cerrar apagas el túnel y la VM, y confirmas con make estado
+
+## 53. Antes de cerrar apagas el túnel y la VM, y confirmas con make estado
+
+*2 min · inicia en 1:52*
 
 Problema: prod no se apaga solo y cuesta mientras está encendido. Lo que cobra mientras está encendido: el Code Editor (unos US$0,10 por hora; se apaga solo tras 60 minutos sin actividad) y la VM de Airflow de prod. Glue y Snowflake cobran solo mientras corre un job o una consulta; el warehouse BIGDATA_WH se suspende solo a los 60 segundos. Entrada: Ctrl+C en la terminal del túnel; en otra, cd ~/bigdata y make airflow-off; luego make estado. Salida esperada: Airflow en stopped y ningún job en RUNNING. Recordatorio: después de cada merge a main que toque src/ o airflow/, el Deploy vuelve a encender la VM de prod; hay que apagarla de nuevo. Presupuesto: al 60 % del gasto real de AWS se impide iniciar jobs de Glue y máquinas, y se detiene la VM; make desbloquear lo revierte. Tiempo: 2 min. Siguiente: Hoy llevaste a prod, validaste y apagaste un pipeline; el Taller 2 es el trabajo por equipo.
