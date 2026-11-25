@@ -1,6 +1,6 @@
 # Clase 8 · Qué completas en tu pipeline y cómo lo llevas a prod
 
-Martes 24 de noviembre de 2026 · 112 min · 52 slides.
+Martes 24 de noviembre de 2026 · 114 min · 53 slides.
 
 - `deck/`: `slides.json` (la fuente), `guion.md` (guion del orador), `index.html`, `slides.pdf` y `slides.pptx`.
   Se regeneran con `cd ~/bigdata/curso && python3 _deck/build.py clase08/deck`.
