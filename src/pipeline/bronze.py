@@ -123,6 +123,7 @@ def registrar_ingesta(
     registrar_control(corrida, tabla, CAPA, mes, filas, inicio, fuente, leidas)
 
 
+"este cambio lo hizo natasha"
 # --- el paso ----------------------------------------------------------------------------------
 
 
