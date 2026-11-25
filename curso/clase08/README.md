@@ -1,6 +1,6 @@
 # Clase 8 · Qué completas en tu pipeline y cómo lo llevas a prod
 
-Martes 24 de noviembre de 2026 · 109 min · 51 slides.
+Martes 24 de noviembre de 2026 · 112 min · 52 slides.
 
 - `deck/`: `slides.json` (la fuente), `guion.md` (guion del orador), `index.html`, `slides.pdf` y `slides.pptx`.
   Se regeneran con `cd ~/bigdata/curso && python3 _deck/build.py clase08/deck`.
@@ -11,4 +11,4 @@ Martes 24 de noviembre de 2026 · 109 min · 51 slides.
   Incluye (slides 40 a 44) dónde se elige el cómputo, la comparación `glue_small`/`glue_medium`/`glue_large` y la
   duplicación en prod: tras reprocesar sin deduplicar, `SUM(VIAJES)` en Snowflake pasa de 19.650.023 a 157.200.184 (×8).
 
-Antes de empezar, todo el equipo corre `cd ~/bigdata && git switch main && git pull && make migrar-clase07`.
+Antes de empezar, todo el equipo corre `cd ~/bigdata && git switch main && git pull && make migrar-clase07`. Solo el anfitrión, una sola vez, crea la VM de prod con `make airflow-habilitar` (sin ella, `make actualizar-vm` falla con «No existe la instancia bigdata-airflow»).

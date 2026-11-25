@@ -11,7 +11,7 @@ requerir aws
 exigir_cuenta
 LAKE="$(lake_bucket)"
 ID="$(find_airflow_instance_id)"
-[[ -n "$ID" ]] || error "No existe la instancia ${PREFIX}-airflow (¿enable_airflow = true?)."
+[[ -n "$ID" ]] || error "No existe la instancia ${PREFIX}-airflow: la VM de prod no se ha creado. Créala con 'cd ~/bigdata && make airflow-habilitar' (una sola vez, solo el anfitrión) y repite."
 [[ "$(instance_state "$ID")" == "running" ]] \
   || error "La VM $ID no está encendida. Enciéndela con 'cd ~/bigdata && make airflow-on', espera ~2 minutos y repite."
 aws s3api head-object --bucket "$LAKE" --key code/airflow/instalar-bootstrap.sh >/dev/null 2>&1 \
