@@ -51,7 +51,7 @@ with DAG(
     max_active_runs=1,
     max_active_tasks=1,
     tags=["bigdata", "fhvhv", ENTORNO],
-    description=f"Pipeline FHVHV en el entorno {nombre_del_entorno(ENTORNO)}",
+    description=f"Pipeline FHVHV en el entorno {nombre_del_entorno(ENTORNO)}.",
     doc_md=documentacion_del_dag(ENTORNO, AVISOS, DEFECTOS),
     params=PARAMS,
 ) as dag:
