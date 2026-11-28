@@ -82,18 +82,18 @@ CAPA = "bronze"
 def agregar_metadatos(
     df: DataFrame, fuente: str, archivo_origen: str, id_lote: str, fecha_ingesta: datetime
 ) -> DataFrame:
-    """Agrega las cinco columnas de metadatos a las columnas originales (que no se tocan).
+    from pyspark.sql import functions as F
 
-    El orden de las columnas nuevas es el de COLUMNAS_METADATOS:
-    _fecha_ingesta, _id_lote, _hash_fila, _fuente, _archivo_origen.
-
-    El hash se calcula primero, solo con las columnas originales (`hash_fila(df.columns)`); así
-    no depende de las otras columnas de metadatos y dos ingestas del mismo archivo dan el mismo
-    hash fila por fila. Eso es lo que después permite deduplicar en silver.
-    """
-    # PENDIENTE(equipo): hoy esta función devuelve df tal cual, sin metadatos. Por eso bronze
-    # no guarda de qué lote ni de qué archivo vino cada fila, y silver no puede deduplicar.
-    return df
+    originales = list(df.columns)
+    con_hash = df.withColumn("_hash_fila", hash_fila(originales))
+    return con_hash.select(
+        *originales,
+        F.lit(fecha_ingesta).alias("_fecha_ingesta"),
+        F.lit(id_lote).alias("_id_lote"),
+        F.col("_hash_fila"),
+        F.lit(fuente).alias("_fuente"),
+        F.lit(archivo_origen).alias("_archivo_origen"),
+    )
 
 
 def debe_ingestar(corrida: Corrida, tabla: str, mes: str) -> bool:
